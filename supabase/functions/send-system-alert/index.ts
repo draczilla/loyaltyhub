@@ -164,6 +164,7 @@ Deno.serve(async (req: Request) => {
 </body>
 </html>
 `;
+        }
 
         const brevoApiKey = Deno.env.get("BREVO_API_KEY");
         const fromEmail = Deno.env.get("EMAIL_FROM") || "alerts@loyaltyhub.com";
