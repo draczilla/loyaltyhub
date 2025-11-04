@@ -72,7 +72,7 @@ export default function SignUp() {
       return;
     }
 
-    navigate('/verify-email');
+    navigate('/pending-verification', { state: { email } });
   };
 
   const handleGoogleSignUp = async () => {

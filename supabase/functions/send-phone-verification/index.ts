@@ -119,7 +119,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const verificationToken = tokenData;
-    const appUrl = Deno.env.get("APP_URL") || "https://your-app.com";
+    const appUrl = Deno.env.get("APP_URL") || "http://localhost:5173";
     const verificationUrl = `${appUrl}/verify-phone?token=${verificationToken}`;
 
     const smsMessage = `${companyName}: Complete your account setup by verifying your phone. Click: ${verificationUrl} (Expires in 15 min)`;

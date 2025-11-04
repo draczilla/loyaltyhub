@@ -96,7 +96,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const verificationToken = tokenData;
-    const appUrl = Deno.env.get("APP_URL") || "https://your-app.com";
+    const appUrl = Deno.env.get("APP_URL") || "http://localhost:5173";
     const verificationUrl = `${appUrl}/verify-email?token=${verificationToken}`;
 
     const emailBody = `
@@ -177,8 +177,8 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         sender: {
-          name: "Loyalty Platform",
-          email: "noreply@yourdomain.com",
+          name: "AdaptiQ Loyalty Platform",
+          email: "noreply@adaptiq.no",
         },
         to: [
           {

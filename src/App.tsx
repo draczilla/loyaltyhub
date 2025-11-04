@@ -30,6 +30,7 @@ import AcceptInvitation from './pages/AcceptInvitation';
 import VerifyEmail from './pages/VerifyEmail';
 import VerifyPhoneSetup from './pages/VerifyPhoneSetup';
 import VerifyPhone from './pages/VerifyPhone';
+import PendingVerification from './pages/PendingVerification';
 
 function App() {
   const { user, loading, isSuperAdmin } = useAuth();
@@ -207,6 +208,7 @@ function App() {
         }
       />
       <Route path="/accept-invitation" element={<AcceptInvitation />} />
+      <Route path="/pending-verification" element={<PendingVerification />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/verify-phone-setup" element={<VerifyPhoneSetup />} />
       <Route path="/verify-phone" element={<VerifyPhone />} />
