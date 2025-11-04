@@ -14,7 +14,8 @@ export default function VerifyEmail() {
   useEffect(() => {
     if (!token) {
       setStatus('error');
-      setMessage('Invalid verification link. Please check your email for the correct link.');
+      setMessage('No verification token provided. Please click the verification link in your email.');
+      setNextStep('login');
       return;
     }
 
@@ -152,8 +153,16 @@ export default function VerifyEmail() {
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-red-500/10 rounded-full mb-4">
                   <XCircle className="w-8 h-8 text-red-400" />
                 </div>
-                <h1 className="text-2xl font-bold text-white mb-2">Verification Failed</h1>
+                <h1 className="text-2xl font-bold text-white mb-2">Verification Issue</h1>
                 <p className="text-gray-400 mb-6">{message}</p>
+
+                {nextStep === 'login' && (
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mb-6">
+                    <p className="text-blue-400 text-sm">
+                      Please check your email inbox (and spam folder) for the verification link we sent you. Click the link in the email to verify your account.
+                    </p>
+                  </div>
+                )}
 
                 {nextStep === 'request_new' && (
                   <button
@@ -169,7 +178,7 @@ export default function VerifyEmail() {
                   onClick={() => navigate('/login')}
                   className="w-full mt-3 py-3 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white font-medium rounded-lg transition"
                 >
-                  Back to Login
+                  {nextStep === 'login' ? 'Continue to Login' : 'Back to Login'}
                 </button>
               </>
             )}

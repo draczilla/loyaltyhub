@@ -1,16 +1,30 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Mail, CheckCircle, AlertCircle } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function PendingVerification() {
   const location = useLocation();
   const navigate = useNavigate();
-  const email = location.state?.email;
+  const { user, business, loading } = useAuth();
+  const email = location.state?.email || business?.email;
   const [timeRemaining, setTimeRemaining] = useState(60);
 
   useEffect(() => {
-    if (!email) {
+    if (loading) return;
+
+    if (!email && !user) {
       navigate('/login');
+      return;
+    }
+
+    if (business?.onboarding_status === 'completed') {
+      navigate('/dashboard');
+      return;
+    }
+
+    if (business?.onboarding_status === 'pending_phone') {
+      navigate('/verify-phone-setup');
       return;
     }
 
@@ -25,7 +39,7 @@ export default function PendingVerification() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [email, navigate]);
+  }, [email, user, business, loading, navigate]);
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
@@ -91,7 +105,7 @@ export default function PendingVerification() {
             onClick={() => navigate('/login')}
             className="text-orange-400 hover:text-orange-300 text-sm font-medium transition"
           >
-            Back to Login
+            {user ? 'Go to Login' : 'Back to Login'}
           </button>
         </div>
       </div>

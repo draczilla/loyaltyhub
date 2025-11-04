@@ -29,14 +29,10 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (business && business.onboarding_status !== 'completed') {
-    const allowedPaths = ['/verify-email', '/verify-phone-setup', '/verify-phone'];
-
-    if (!allowedPaths.includes(location.pathname)) {
-      if (business.onboarding_status === 'pending_email') {
-        return <Navigate to="/verify-email" replace />;
-      } else if (business.onboarding_status === 'pending_phone') {
-        return <Navigate to="/verify-phone-setup" replace />;
-      }
+    if (business.onboarding_status === 'pending_email' && location.pathname !== '/pending-verification') {
+      return <Navigate to="/pending-verification" replace state={{ email: business.email }} />;
+    } else if (business.onboarding_status === 'pending_phone' && location.pathname !== '/verify-phone-setup') {
+      return <Navigate to="/verify-phone-setup" replace />;
     }
   }
 
