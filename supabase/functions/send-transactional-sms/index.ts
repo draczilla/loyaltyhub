@@ -15,6 +15,194 @@ interface TransactionalSmsRequest {
   recipientPhone?: string;
   message?: string;
   isTestSms?: boolean;
+  forceProvider?: 'brevo' | 'twilio';
+}
+
+interface SmsResult {
+  success: boolean;
+  messageId?: string;
+  error?: string;
+  provider?: string;
+}
+
+async function sendSmsViaBrevo(
+  apiKey: string,
+  sender: string,
+  recipientPhone: string,
+  message: string
+): Promise<SmsResult> {
+  try {
+    const response = await fetch("https://api.brevo.com/v3/transactionalSMS/sms", {
+      method: "POST",
+      headers: {
+        "api-key": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        sender: sender,
+        recipient: recipientPhone,
+        content: message,
+        type: "transactional",
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Brevo SMS API error:", errorText);
+      return {
+        success: false,
+        error: `Brevo API returned ${response.status}: ${errorText}`,
+        provider: 'brevo',
+      };
+    }
+
+    const responseData = await response.json();
+    const messageId = responseData.reference || responseData.messageId;
+
+    return {
+      success: true,
+      messageId: messageId || undefined,
+      provider: 'brevo',
+    };
+  } catch (error) {
+    console.error("Error sending SMS via Brevo:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+      provider: 'brevo',
+    };
+  }
+}
+
+async function sendSmsViaTwilio(
+  accountSid: string,
+  authToken: string,
+  fromNumber: string,
+  recipientPhone: string,
+  message: string
+): Promise<SmsResult> {
+  try {
+    const credentials = btoa(`${accountSid}:${authToken}`);
+
+    const response = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Basic ${credentials}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          To: recipientPhone,
+          From: fromNumber,
+          Body: message,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Twilio SMS API error:", errorText);
+      return {
+        success: false,
+        error: `Twilio API returned ${response.status}: ${errorText}`,
+        provider: 'twilio',
+      };
+    }
+
+    const responseData = await response.json();
+    const messageId = responseData.sid;
+
+    return {
+      success: true,
+      messageId: messageId || undefined,
+      provider: 'twilio',
+    };
+  } catch (error) {
+    console.error("Error sending SMS via Twilio:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+      provider: 'twilio',
+    };
+  }
+}
+
+async function updateProviderStatus(
+  supabase: any,
+  provider: string,
+  success: boolean,
+  error?: string
+) {
+  try {
+    const { data: settings } = await supabase
+      .from("platform_settings")
+      .select("sms_provider_status")
+      .limit(1)
+      .maybeSingle();
+
+    if (!settings) return;
+
+    const status = settings.sms_provider_status || {};
+    const providerStatus = status[provider] || {};
+
+    const updatedStatus = {
+      ...status,
+      [provider]: {
+        healthy: success,
+        last_success_at: success ? new Date().toISOString() : providerStatus.last_success_at,
+        last_failure_at: success ? providerStatus.last_failure_at : new Date().toISOString(),
+        failure_count: success ? 0 : (providerStatus.failure_count || 0) + 1,
+        last_error: success ? null : error,
+      },
+    };
+
+    await supabase
+      .from("platform_settings")
+      .update({ sms_provider_status: updatedStatus })
+      .limit(1);
+  } catch (err) {
+    console.error("Error updating provider status:", err);
+  }
+}
+
+async function sendSystemAlert(
+  supabase: any,
+  fromProvider: string,
+  toProvider: string,
+  error: string
+) {
+  try {
+    const { data: settings } = await supabase
+      .from("platform_settings")
+      .select("alert_email, alert_phone")
+      .limit(1)
+      .maybeSingle();
+
+    if (!settings) return;
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+
+    if (settings.alert_email && supabaseUrl) {
+      await fetch(`${supabaseUrl}/functions/v1/send-system-alert`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+        },
+        body: JSON.stringify({
+          type: 'sms_provider_switch',
+          from_provider: fromProvider,
+          to_provider: toProvider,
+          error: error,
+          alert_email: settings.alert_email,
+          alert_phone: settings.alert_phone,
+        }),
+      }).catch(err => console.error("Failed to send system alert:", err));
+    }
+  } catch (err) {
+    console.error("Error sending system alert:", err);
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -31,7 +219,7 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body: TransactionalSmsRequest = await req.json();
-    const { businessId, customerId, triggerType, variables = {}, recipientPhone, message, isTestSms } = body;
+    const { businessId, customerId, triggerType, variables = {}, recipientPhone, message, isTestSms, forceProvider } = body;
 
     if (isTestSms) {
       if (!recipientPhone || !message) {
@@ -152,146 +340,130 @@ Deno.serve(async (req: Request) => {
       finalRecipientPhone = customer.phone;
     }
 
-    let apiKey: string;
-    let apiSecret: string;
-    let fromNumber: string;
+    const { data: platformSettings } = await supabase
+      .from("platform_settings")
+      .select("primary_sms_provider")
+      .limit(1)
+      .maybeSingle();
 
-    if (businessId && !isTestSms) {
-      const { data: integration } = await supabase
-        .from("integrations")
-        .select("credentials")
-        .eq("business_id", businessId)
-        .eq("service", "vonage")
-        .eq("active", true)
-        .maybeSingle();
+    const primaryProvider = forceProvider || platformSettings?.primary_sms_provider || 'brevo';
+    const fallbackProvider = primaryProvider === 'brevo' ? 'twilio' : 'brevo';
 
-      if (integration && integration.credentials) {
-        apiKey = integration.credentials.apiKey;
-        apiSecret = integration.credentials.apiSecret;
-        fromNumber = integration.credentials.fromNumber || integration.credentials.senderId;
-      } else {
-        const platformApiKey = Deno.env.get("VONAGE_API_KEY");
-        const platformApiSecret = Deno.env.get("VONAGE_API_SECRET");
-        const platformFromNumber = Deno.env.get("VONAGE_FROM_NUMBER");
+    const brevoApiKey = Deno.env.get("BREVO_API_KEY");
+    const brevoSender = Deno.env.get("BREVO_SMS_SENDER");
+    const twilioSid = Deno.env.get("TWILIO_ACCOUNT_SID");
+    const twilioToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+    const twilioPhone = Deno.env.get("TWILIO_PHONE_NUMBER");
 
-        if (!platformApiKey || !platformApiSecret) {
-          return new Response(
-            JSON.stringify({ error: "Vonage integration not configured for this business and no platform credentials available" }),
-            {
-              status: 400,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            }
-          );
-        }
+    const hasBrevo = !!(brevoApiKey && brevoSender);
+    const hasTwilio = !!(twilioSid && twilioToken && twilioPhone);
 
-        if (!platformFromNumber) {
-          return new Response(
-            JSON.stringify({ error: "Platform Vonage From Number not configured" }),
-            {
-              status: 400,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            }
-          );
-        }
-
-        apiKey = platformApiKey;
-        apiSecret = platformApiSecret;
-        fromNumber = platformFromNumber;
-      }
-    } else {
-      const platformApiKey = Deno.env.get("VONAGE_API_KEY");
-      const platformApiSecret = Deno.env.get("VONAGE_API_SECRET");
-      const platformFromNumber = Deno.env.get("VONAGE_FROM_NUMBER");
-
-      if (!platformApiKey || !platformApiSecret || !platformFromNumber) {
-        return new Response(
-          JSON.stringify({ error: "Platform Vonage credentials not configured" }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-
-      apiKey = platformApiKey;
-      apiSecret = platformApiSecret;
-      fromNumber = platformFromNumber;
-    }
-
-    try {
-      const vonageApiUrl = `https://rest.nexmo.com/sms/json`;
-
-      const vonageResponse = await fetch(vonageApiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          api_key: apiKey,
-          api_secret: apiSecret,
-          to: finalRecipientPhone,
-          from: fromNumber,
-          text: finalMessage,
-        }),
-      });
-
-      const response = await vonageResponse.json();
-
-      const messageId = response.messages?.[0]?.["message-id"] || response.messages?.[0]?.messageId;
-      const status = response.messages?.[0]?.status;
-
-      if (status !== "0") {
-        const errorText = response.messages?.[0]?.["error-text"] || "Failed to send SMS";
-        throw new Error(errorText);
-      }
-
-      if (!isTestSms && businessId && business && customer) {
-        await supabase
-          .from("businesses")
-          .update({ usage_sms_monthly: business.usage_sms_monthly + 1 })
-          .eq("id", businessId);
-
-        await supabase.from("sms_logs").insert({
-          business_id: businessId,
-          customer_id: customerId,
-          recipient_phone: customer.phone,
-          message: finalMessage,
-          status: 'sent',
-          provider_message_id: messageId,
-          segments: 1,
-        });
-      }
-
+    if (!hasBrevo && !hasTwilio) {
       return new Response(
-        JSON.stringify({ success: true, messageId: messageId }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    } catch (error) {
-      console.error("Failed to send SMS:", error);
-
-      if (!isTestSms && businessId && customer) {
-        await supabase.from("sms_logs").insert({
-          business_id: businessId,
-          customer_id: customerId,
-          recipient_phone: customer.phone,
-          message: finalMessage,
-          status: 'failed',
-          error_message: error instanceof Error ? error.message : 'Unknown error',
-          segments: 1,
-        });
-      }
-
-      return new Response(
-        JSON.stringify({ error: error instanceof Error ? error.message : "Failed to send SMS" }),
+        JSON.stringify({ error: "No SMS provider configured. Please configure Brevo or Twilio credentials." }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
+
+    let sendResult: SmsResult;
+    let usedProvider = primaryProvider;
+
+    if (primaryProvider === 'brevo' && hasBrevo) {
+      sendResult = await sendSmsViaBrevo(brevoApiKey!, brevoSender!, finalRecipientPhone, finalMessage);
+
+      if (!sendResult.success && hasTwilio) {
+        console.log(`Brevo failed, falling back to Twilio. Error: ${sendResult.error}`);
+        await updateProviderStatus(supabase, 'brevo', false, sendResult.error);
+        await sendSystemAlert(supabase, 'brevo', 'twilio', sendResult.error || 'Unknown error');
+
+        sendResult = await sendSmsViaTwilio(twilioSid!, twilioToken!, twilioPhone!, finalRecipientPhone, finalMessage);
+        usedProvider = 'twilio';
+      }
+    } else if (primaryProvider === 'twilio' && hasTwilio) {
+      sendResult = await sendSmsViaTwilio(twilioSid!, twilioToken!, twilioPhone!, finalRecipientPhone, finalMessage);
+
+      if (!sendResult.success && hasBrevo) {
+        console.log(`Twilio failed, falling back to Brevo. Error: ${sendResult.error}`);
+        await updateProviderStatus(supabase, 'twilio', false, sendResult.error);
+        await sendSystemAlert(supabase, 'twilio', 'brevo', sendResult.error || 'Unknown error');
+
+        sendResult = await sendSmsViaBrevo(brevoApiKey!, brevoSender!, finalRecipientPhone, finalMessage);
+        usedProvider = 'brevo';
+      }
+    } else {
+      if (hasBrevo) {
+        sendResult = await sendSmsViaBrevo(brevoApiKey!, brevoSender!, finalRecipientPhone, finalMessage);
+        usedProvider = 'brevo';
+      } else {
+        sendResult = await sendSmsViaTwilio(twilioSid!, twilioToken!, twilioPhone!, finalRecipientPhone, finalMessage);
+        usedProvider = 'twilio';
+      }
+    }
+
+    if (sendResult.success) {
+      await updateProviderStatus(supabase, usedProvider, true);
+    } else {
+      await updateProviderStatus(supabase, usedProvider, false, sendResult.error);
+    }
+
+    if (!isTestSms && businessId) {
+      const { error: logError } = await supabase
+        .from("communication_logs")
+        .insert({
+          business_id: businessId,
+          customer_id: customerId || null,
+          type: "sms",
+          content: finalMessage,
+          status: sendResult.success ? "sent" : "failed",
+          error_message: sendResult.error || null,
+          provider: usedProvider,
+          provider_message_id: sendResult.messageId || null,
+          metadata: {
+            recipient_phone: finalRecipientPhone,
+          },
+        });
+
+      if (logError) {
+        console.error("Error logging SMS:", logError);
+      }
+
+      if (business && customer) {
+        await supabase.from("sms_logs").insert({
+          business_id: businessId,
+          customer_id: customerId,
+          recipient_phone: customer.phone,
+          message: finalMessage,
+          status: sendResult.success ? 'sent' : 'failed',
+          provider_message_id: sendResult.messageId,
+          provider: usedProvider,
+          error_message: sendResult.error || null,
+          segments: 1,
+        });
+      }
+
+      if (sendResult.success) {
+        await supabase.rpc("increment_business_usage", {
+          p_business_id: businessId,
+          p_column_name: "usage_sms_monthly",
+        });
+      }
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: sendResult.success,
+        messageId: sendResult.messageId,
+        provider: usedProvider,
+        error: sendResult.error,
+      }),
+      {
+        status: sendResult.success ? 200 : 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   } catch (error) {
     console.error("Error in send-transactional-sms function:", error);
     return new Response(

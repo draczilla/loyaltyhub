@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Menu, Send, Mail, MessageSquare, AlertCircle, Check, Info } from 'lucide-react';
 import SuperAdminSidebar from '../components/SuperAdminSidebar';
 import { supabase } from '../lib/supabase';
@@ -11,6 +11,9 @@ export default function SuperAdminTestCommunications() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [loadingSettings, setLoadingSettings] = useState(true);
+  const [smsProvider, setSmsProvider] = useState<'auto' | 'brevo' | 'twilio'>('auto');
+  const [platformSettings, setPlatformSettings] = useState<any>(null);
 
   const [emailForm, setEmailForm] = useState({
     recipientEmail: '',
@@ -21,8 +24,26 @@ export default function SuperAdminTestCommunications() {
 
   const [smsForm, setSmsForm] = useState({
     recipientPhone: '',
-    message: 'This is a test SMS sent through LoyaltyHub\'s centralized Vonage integration.',
+    message: 'This is a test SMS sent through LoyaltyHub\'s SMS integration.',
   });
+
+  useEffect(() => {
+    loadPlatformSettings();
+  }, []);
+
+  const loadPlatformSettings = async () => {
+    setLoadingSettings(true);
+    const { data } = await supabase
+      .from('platform_settings')
+      .select('*')
+      .limit(1)
+      .maybeSingle();
+
+    if (data) {
+      setPlatformSettings(data);
+    }
+    setLoadingSettings(false);
+  };
 
   const handleSendEmail = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,6 +101,16 @@ export default function SuperAdminTestCommunications() {
         throw new Error('No active session');
       }
 
+      const requestBody: any = {
+        recipientPhone: smsForm.recipientPhone,
+        message: smsForm.message,
+        isTestSms: true,
+      };
+
+      if (smsProvider !== 'auto') {
+        requestBody.forceProvider = smsProvider;
+      }
+
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-transactional-sms`;
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -87,11 +118,7 @@ export default function SuperAdminTestCommunications() {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          recipientPhone: smsForm.recipientPhone,
-          message: smsForm.message,
-          isTestSms: true,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const result = await response.json();
@@ -100,7 +127,7 @@ export default function SuperAdminTestCommunications() {
         throw new Error(result.error || 'Failed to send SMS');
       }
 
-      setSuccess(`SMS sent successfully! Message ID: ${result.messageId || 'N/A'}`);
+      setSuccess(`SMS sent successfully via ${result.provider || 'unknown provider'}! Message ID: ${result.messageId || 'N/A'}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send SMS');
     } finally {
@@ -124,7 +151,7 @@ export default function SuperAdminTestCommunications() {
               <div>
                 <h1 className="text-2xl font-bold text-white">Test Communications</h1>
                 <p className="text-gray-400 text-sm mt-1">
-                  Test centralized Brevo and Vonage integrations
+                  Test centralized Brevo and Twilio integrations
                 </p>
               </div>
             </div>
@@ -139,8 +166,8 @@ export default function SuperAdminTestCommunications() {
                 <div>
                   <h3 className="text-white font-medium mb-1">Internal Testing Tool</h3>
                   <p className="text-sm text-gray-400">
-                    This is an internal tool for super admins to verify that LoyaltyHub's Brevo and Vonage
-                    integrations are working correctly. Use this to test SMTP and SMS delivery without
+                    This is an internal tool for super admins to verify that LoyaltyHub's Brevo and Twilio
+                    integrations are working correctly. Use this to test email and SMS delivery without
                     affecting tenant accounts or usage limits.
                   </p>
                 </div>
@@ -276,6 +303,56 @@ export default function SuperAdminTestCommunications() {
                   </form>
                 ) : (
                   <form onSubmit={handleSendSms} className="space-y-4">
+                    {!loadingSettings && platformSettings && (
+                      <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4">
+                        <h3 className="text-sm font-semibold text-white mb-3">Provider Status</h3>
+                        <div className="grid grid-cols-2 gap-4 text-xs">
+                          <div>
+                            <div className="text-gray-400 mb-1">Primary Provider</div>
+                            <div className="text-orange-400 font-medium">
+                              {platformSettings.primary_sms_provider?.toUpperCase() || 'BREVO'}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-gray-400 mb-1">Fallback Provider</div>
+                            <div className="text-orange-400 font-medium">
+                              {platformSettings.primary_sms_provider === 'twilio' ? 'BREVO' : 'TWILIO'}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-gray-400 mb-1">Brevo Status</div>
+                            <div className={platformSettings.sms_provider_status?.brevo?.healthy ? 'text-green-400' : 'text-red-400'}>
+                              {platformSettings.sms_provider_status?.brevo?.healthy ? 'Healthy' : 'Unhealthy'}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-gray-400 mb-1">Twilio Status</div>
+                            <div className={platformSettings.sms_provider_status?.twilio?.healthy ? 'text-green-400' : 'text-red-400'}>
+                              {platformSettings.sms_provider_status?.twilio?.healthy ? 'Healthy' : 'Unhealthy'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Test Provider
+                      </label>
+                      <select
+                        value={smsProvider}
+                        onChange={(e) => setSmsProvider(e.target.value as 'auto' | 'brevo' | 'twilio')}
+                        className="w-full px-4 py-3 bg-black border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition"
+                      >
+                        <option value="auto">Auto (Use Primary with Fallback)</option>
+                        <option value="brevo">Force Brevo</option>
+                        <option value="twilio">Force Twilio</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1.5">
+                        Select a specific provider to test or use Auto for fallback testing
+                      </p>
+                    </div>
+
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
                         Recipient Phone Number *
@@ -330,11 +407,11 @@ export default function SuperAdminTestCommunications() {
                     </div>
 
                     <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4">
-                      <h3 className="text-sm font-semibold text-white mb-2">Platform Configuration</h3>
+                      <h3 className="text-sm font-semibold text-white mb-2">Testing Information</h3>
                       <ul className="text-xs text-gray-400 space-y-1">
-                        <li>Provider: <span className="text-orange-400">Vonage (LoyaltyHub Account)</span></li>
-                        <li>From: Platform-configured phone number</li>
+                        <li>Selected: <span className="text-orange-400">{smsProvider === 'auto' ? 'AUTO (with fallback)' : smsProvider.toUpperCase()}</span></li>
                         <li>Note: This test does not count against tenant limits</li>
+                        <li>Auto mode will test primary provider with automatic fallback</li>
                       </ul>
                     </div>
                   </form>
