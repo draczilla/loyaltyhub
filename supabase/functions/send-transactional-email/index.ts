@@ -314,6 +314,17 @@ Deno.serve(async (req: Request) => {
     const platformFromEmail = Deno.env.get("EMAIL_FROM");
     const platformFromName = Deno.env.get("EMAIL_FROM_NAME");
 
+    console.log("Environment check:", {
+      hasBrevoKey: !!platformBrevoKey,
+      brevoKeyLength: platformBrevoKey?.length || 0,
+      hasSendGridKey: !!platformSendGridKey,
+      hasFromEmail: !!platformFromEmail,
+      fromEmail: platformFromEmail,
+      hasFromName: !!platformFromName,
+      fromName: platformFromName,
+      isTestEmail: isTestEmail
+    });
+
     const brevoApiKey = emailConfig.brevoApiKey || platformBrevoKey;
     const sendgridApiKey = emailConfig.sendgridApiKey || platformSendGridKey;
     const fromEmail = emailConfig.fromEmail || platformFromEmail;
@@ -324,7 +335,15 @@ Deno.serve(async (req: Request) => {
 
     if ((!useBrevo && !useSendGrid) || !fromEmail || !fromName) {
       return new Response(
-        JSON.stringify({ error: "Email configuration not found. Please configure Brevo or SendGrid credentials." }),
+        JSON.stringify({
+          error: "Email configuration not found. Please configure Brevo or SendGrid credentials.",
+          debug: {
+            hasBrevoKey: !!platformBrevoKey,
+            hasSendGridKey: !!platformSendGridKey,
+            hasFromEmail: !!platformFromEmail,
+            hasFromName: !!platformFromName
+          }
+        }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -341,6 +360,16 @@ Deno.serve(async (req: Request) => {
     if (emailTrackingEnabled) {
       htmlBody = injectTrackingPixel(htmlBody, trackingToken, supabaseUrl);
     }
+
+    console.log("Sending email:", {
+      useBrevo,
+      useSendGrid,
+      hasBrevoKey: !!brevoApiKey,
+      brevoKeyPrefix: brevoApiKey?.substring(0, 10),
+      fromEmail,
+      fromName,
+      recipientEmail
+    });
 
     const sendResult = useBrevo
       ? await sendEmailViaBrevo(
