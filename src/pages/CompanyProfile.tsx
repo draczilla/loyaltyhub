@@ -438,9 +438,20 @@ export default function CompanyProfile() {
                   ></div>
                 </div>
                 {seatInfo.percentage >= 100 && (
-                  <p className="text-yellow-400 text-sm mt-2">
-                    You've reached your seat limit. Upgrade your plan to invite more team members.
-                  </p>
+                  <div className="mt-4 flex items-center justify-between p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <AlertCircle className="w-5 h-5 text-yellow-400" />
+                      <p className="text-yellow-400 text-sm">
+                        You've reached your seat limit. Upgrade your plan to invite more team members.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => window.location.href = '/subscription'}
+                      className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition whitespace-nowrap"
+                    >
+                      Upgrade Plan
+                    </button>
+                  </div>
                 )}
               </div>
 
