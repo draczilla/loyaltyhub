@@ -13,7 +13,8 @@ import {
   FileText,
   MessageSquare,
   Settings as SettingsIcon,
-  History
+  History,
+  Building2
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -41,6 +42,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     { icon: FileText, label: 'Email Templates', path: '/email-templates' },
     { icon: History, label: 'Communications', path: '/communications' },
     { icon: BarChart3, label: 'Analytics', path: '/analytics' },
+    { icon: Building2, label: 'Company Profile', path: '/company' },
     { icon: SettingsIcon, label: 'Settings', path: '/settings' },
     { icon: CreditCard, label: 'Subscription', path: '/subscription' },
   ];

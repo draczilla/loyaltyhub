@@ -22,6 +22,8 @@ import SuperAdminConfig from './pages/SuperAdminConfig';
 import SuperAdminCredits from './pages/SuperAdminCredits';
 import CustomerPortalLogin from './pages/CustomerPortalLogin';
 import CustomerDashboard from './pages/CustomerDashboard';
+import CompanyProfile from './pages/CompanyProfile';
+import AcceptInvitation from './pages/AcceptInvitation';
 
 function App() {
   const { user, loading, isSuperAdmin } = useAuth();
@@ -166,6 +168,16 @@ function App() {
 
       <Route path="/customer/login" element={<CustomerPortalLogin />} />
       <Route path="/customer/dashboard" element={<CustomerDashboard />} />
+
+      <Route
+        path="/company"
+        element={
+          <ProtectedRoute>
+            <CompanyProfile />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/accept-invitation" element={<AcceptInvitation />} />
     </Routes>
   );
 }

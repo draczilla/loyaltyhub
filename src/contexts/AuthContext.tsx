@@ -16,14 +16,27 @@ interface Business {
   credits_remaining: number;
   stripe_price_id: string | null;
   subscription_period_end: string | null;
+  tenant_id: string | null;
+  is_tenant_admin: boolean;
+}
+
+interface Tenant {
+  id: string;
+  company_name: string;
+  logo_url: string | null;
+  primary_color: string;
+  admin_user_id: string;
+  created_at: string;
 }
 
 interface AuthContextType {
   user: User | null;
   business: Business | null;
+  tenant: Tenant | null;
   session: Session | null;
   loading: boolean;
   isSuperAdmin: boolean;
+  isTenantAdmin: boolean;
   signUp: (email: string, password: string, companyName: string, tierId: string) => Promise<{ error: AuthError | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
@@ -36,9 +49,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
+  const [tenant, setTenant] = useState<Tenant | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [isTenantAdmin, setIsTenantAdmin] = useState(false);
 
   useEffect(() => {
     const sessionTimeout = setTimeout(() => {
@@ -69,7 +84,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await loadBusiness(session.user.id);
         } else {
           setBusiness(null);
+          setTenant(null);
           setIsSuperAdmin(false);
+          setIsTenantAdmin(false);
           setLoading(false);
         }
       })();
@@ -95,7 +112,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!superAdminError && superAdminData) {
         console.log('Loaded super admin data:', superAdminData);
         setBusiness(null);
+        setTenant(null);
         setIsSuperAdmin(true);
+        setIsTenantAdmin(false);
         setLoading(false);
         return;
       }
@@ -111,11 +130,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         console.error('Error loading business:', error);
         setBusiness(null);
+        setTenant(null);
         setIsSuperAdmin(false);
+        setIsTenantAdmin(false);
       } else if (data) {
         console.log('Loaded business data:', data);
         setBusiness(data);
         setIsSuperAdmin(false);
+        setIsTenantAdmin(data.is_tenant_admin || false);
+
+        // Load tenant data if business has a tenant
+        if (data.tenant_id) {
+          await loadTenant(data.tenant_id);
+        } else {
+          setTenant(null);
+        }
       } else {
         console.warn('No business record found for user:', userId);
         await createBusinessForOAuthUser(userId);
@@ -123,9 +152,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Exception loading business:', error);
       setBusiness(null);
+      setTenant(null);
       setIsSuperAdmin(false);
+      setIsTenantAdmin(false);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadTenant = async (tenantId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('*')
+        .eq('id', tenantId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error loading tenant:', error);
+        setTenant(null);
+      } else if (data) {
+        console.log('Loaded tenant data:', data);
+        setTenant(data);
+      }
+    } catch (error) {
+      console.error('Exception loading tenant:', error);
+      setTenant(null);
     }
   };
 
@@ -136,7 +188,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!user || !user.email) {
         console.error('Cannot create business: no user email found');
         setBusiness(null);
+        setTenant(null);
         setIsSuperAdmin(false);
+        setIsTenantAdmin(false);
         return;
       }
 
@@ -151,12 +205,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!tierId) {
         console.error('Cannot create business: free tier not found');
         setBusiness(null);
+        setTenant(null);
         setIsSuperAdmin(false);
+        setIsTenantAdmin(false);
         return;
       }
 
       const companyName = user.user_metadata?.full_name || user.email.split('@')[0];
 
+      // Create tenant first
+      const { data: newTenant, error: tenantError } = await supabase
+        .from('tenants')
+        .insert({
+          company_name: companyName,
+          admin_user_id: userId,
+        })
+        .select()
+        .single();
+
+      if (tenantError) {
+        console.error('Error creating tenant for OAuth user:', tenantError);
+        setBusiness(null);
+        setTenant(null);
+        setIsSuperAdmin(false);
+        setIsTenantAdmin(false);
+        return;
+      }
+
+      // Create business linked to tenant
       const { data: newBusiness, error: businessError } = await supabase
         .from('businesses')
         .insert({
@@ -167,6 +243,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           subscription_status: 'trial',
           usage_customers: 0,
           usage_sms_monthly: 0,
+          tenant_id: newTenant.id,
+          is_tenant_admin: true,
         })
         .select()
         .single();
@@ -174,16 +252,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (businessError) {
         console.error('Error creating business for OAuth user:', businessError);
         setBusiness(null);
+        setTenant(null);
         setIsSuperAdmin(false);
+        setIsTenantAdmin(false);
       } else if (newBusiness) {
         console.log('Created business for OAuth user:', newBusiness);
         setBusiness(newBusiness);
+        setTenant(newTenant);
         setIsSuperAdmin(false);
+        setIsTenantAdmin(true);
+
+        // Create tenant member record
+        await supabase.from('tenant_members').insert({
+          tenant_id: newTenant.id,
+          user_id: userId,
+          role: 'admin',
+          status: 'active',
+          accepted_at: new Date().toISOString(),
+        });
       }
     } catch (error) {
       console.error('Exception creating business for OAuth user:', error);
       setBusiness(null);
+      setTenant(null);
       setIsSuperAdmin(false);
+      setIsTenantAdmin(false);
     }
   };
 
@@ -197,6 +290,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: authError };
     }
 
+    // Create tenant first
+    const { data: newTenant, error: tenantError } = await supabase
+      .from('tenants')
+      .insert({
+        company_name: companyName,
+        admin_user_id: authData.user.id,
+      })
+      .select()
+      .single();
+
+    if (tenantError) {
+      return { error: tenantError as any };
+    }
+
+    // Create business linked to tenant
     const { error: businessError } = await supabase
       .from('businesses')
       .insert({
@@ -207,10 +315,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         subscription_status: 'trial',
         usage_customers: 0,
         usage_sms_monthly: 0,
+        tenant_id: newTenant.id,
+        is_tenant_admin: true,
       });
 
     if (businessError) {
       return { error: businessError as any };
+    }
+
+    // Create tenant member record
+    const { error: memberError } = await supabase
+      .from('tenant_members')
+      .insert({
+        tenant_id: newTenant.id,
+        user_id: authData.user.id,
+        role: 'admin',
+        status: 'active',
+        accepted_at: new Date().toISOString(),
+      });
+
+    if (memberError) {
+      console.error('Error creating tenant member:', memberError);
     }
 
     return { error: null };
@@ -238,7 +363,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setUser(null);
     setBusiness(null);
+    setTenant(null);
     setIsSuperAdmin(false);
+    setIsTenantAdmin(false);
     setSession(null);
   };
 
@@ -252,9 +379,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         business,
+        tenant,
         session,
         loading,
         isSuperAdmin,
+        isTenantAdmin,
         signUp,
         signIn,
         signInWithGoogle,

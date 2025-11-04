@@ -38,11 +38,55 @@ export type Database = {
           usage_customers: number;
           usage_sms_monthly: number;
           usage_reset_date: string;
+          tenant_id: string | null;
+          is_tenant_admin: boolean;
           created_at: string;
           updated_at: string;
         };
         Insert: Omit<Database['public']['Tables']['businesses']['Row'], 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['businesses']['Insert']>;
+      };
+      tenants: {
+        Row: {
+          id: string;
+          company_name: string;
+          logo_url: string | null;
+          primary_color: string;
+          admin_user_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['tenants']['Row'], 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['tenants']['Insert']>;
+      };
+      tenant_members: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          user_id: string;
+          role: 'admin' | 'member';
+          status: 'active' | 'inactive';
+          invited_at: string;
+          accepted_at: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['tenant_members']['Row'], 'id' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['tenant_members']['Insert']>;
+      };
+      tenant_invitations: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          email: string;
+          token: string;
+          invited_by: string | null;
+          role: 'admin' | 'member';
+          status: 'pending' | 'accepted' | 'expired' | 'revoked';
+          expires_at: string;
+          created_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['tenant_invitations']['Row'], 'id' | 'token' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['tenant_invitations']['Insert']>;
       };
       customers: {
         Row: {
