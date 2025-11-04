@@ -114,7 +114,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 mt-2"
                   >
                     <ShieldAlert className="w-5 h-5" />
-                    <span className="font-medium">Super Admin Console</span>
+                    <span className="font-medium">Super Admin</span>
                   </button>
                 </li>
               )}
