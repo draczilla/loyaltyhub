@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 interface ProtectedRouteProps {
@@ -6,7 +6,8 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { user, loading } = useAuth();
+  const { user, business, loading, isSuperAdmin } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -21,6 +22,22 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (isSuperAdmin) {
+    return <>{children}</>;
+  }
+
+  if (business && business.onboarding_status !== 'completed') {
+    const allowedPaths = ['/verify-email', '/verify-phone-setup', '/verify-phone'];
+
+    if (!allowedPaths.includes(location.pathname)) {
+      if (business.onboarding_status === 'pending_email') {
+        return <Navigate to="/verify-email" replace />;
+      } else if (business.onboarding_status === 'pending_phone') {
+        return <Navigate to="/verify-phone-setup" replace />;
+      }
+    }
   }
 
   return <>{children}</>;

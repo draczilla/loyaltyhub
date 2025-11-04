@@ -72,25 +72,7 @@ export default function SignUp() {
       return;
     }
 
-    const selectedTierData = tiers.find(t => t.id === selectedTier);
-
-    if (selectedTierData?.price_monthly === 0) {
-      navigate('/dashboard');
-      return;
-    }
-
-    if (selectedTierData?.stripe_price_id) {
-      try {
-        await redirectToCheckout(selectedTierData.stripe_price_id);
-      } catch (checkoutError) {
-        console.error('Checkout error:', checkoutError);
-        setError('Failed to redirect to checkout. You can upgrade from your dashboard.');
-        setLoading(false);
-        setTimeout(() => navigate('/dashboard'), 2000);
-      }
-    } else {
-      navigate('/dashboard');
-    }
+    navigate('/verify-email');
   };
 
   const handleGoogleSignUp = async () => {
