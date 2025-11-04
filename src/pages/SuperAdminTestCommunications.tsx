@@ -1,87 +1,31 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Menu, Send, Mail, MessageSquare, AlertCircle, Check, Info } from 'lucide-react';
 import SuperAdminSidebar from '../components/SuperAdminSidebar';
 import { supabase } from '../lib/supabase';
-
-interface Business {
-  id: string;
-  company_name: string;
-  email: string;
-}
 
 type TabType = 'email' | 'sms';
 
 export default function SuperAdminTestCommunications() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('email');
-  const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
   const [emailForm, setEmailForm] = useState({
-    businessId: '',
     recipientEmail: '',
     recipientName: '',
     subject: 'Test Email from LoyaltyHub',
     body: 'This is a test email sent through LoyaltyHub\'s centralized Brevo integration. If you receive this, the integration is working correctly!',
-    tenantSignature: '',
   });
 
   const [smsForm, setSmsForm] = useState({
-    businessId: '',
     recipientPhone: '',
     message: 'This is a test SMS sent through LoyaltyHub\'s centralized Vonage integration.',
-    tenantSignature: '',
   });
-
-  useEffect(() => {
-    loadBusinesses();
-  }, []);
-
-  const loadBusinesses = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('businesses')
-        .select('id, company_name, email')
-        .order('company_name');
-
-      if (error) throw error;
-      if (data) setBusinesses(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load businesses');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleBusinessChange = (businessId: string) => {
-    const business = businesses.find((b) => b.id === businessId);
-    if (business) {
-      if (activeTab === 'email') {
-        setEmailForm({
-          ...emailForm,
-          businessId,
-          tenantSignature: `\n\n---\nSent on behalf of ${business.company_name}`,
-        });
-      } else {
-        setSmsForm({
-          ...smsForm,
-          businessId,
-          tenantSignature: `\n- ${business.company_name}`,
-        });
-      }
-    }
-  };
 
   const handleSendEmail = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!emailForm.businessId) {
-      setError('Please select a tenant');
-      return;
-    }
 
     setSending(true);
     setError('');
@@ -93,8 +37,6 @@ export default function SuperAdminTestCommunications() {
         throw new Error('No active session');
       }
 
-      const bodyWithSignature = emailForm.body + emailForm.tenantSignature;
-
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-transactional-email`;
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -103,12 +45,11 @@ export default function SuperAdminTestCommunications() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          businessId: emailForm.businessId,
-          customerId: null,
           subject: emailForm.subject,
-          body: bodyWithSignature,
+          body: emailForm.body,
           recipientEmail: emailForm.recipientEmail,
           recipientName: emailForm.recipientName,
+          isTestEmail: true,
         }),
       });
 
@@ -128,10 +69,6 @@ export default function SuperAdminTestCommunications() {
 
   const handleSendSms = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!smsForm.businessId) {
-      setError('Please select a tenant');
-      return;
-    }
 
     setSending(true);
     setError('');
@@ -143,8 +80,6 @@ export default function SuperAdminTestCommunications() {
         throw new Error('No active session');
       }
 
-      const messageWithSignature = smsForm.message + smsForm.tenantSignature;
-
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-transactional-sms`;
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -153,9 +88,9 @@ export default function SuperAdminTestCommunications() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          businessId: smsForm.businessId,
           recipientPhone: smsForm.recipientPhone,
-          message: messageWithSignature,
+          message: smsForm.message,
+          isTestSms: true,
         }),
       });
 
@@ -189,7 +124,7 @@ export default function SuperAdminTestCommunications() {
               <div>
                 <h1 className="text-2xl font-bold text-white">Test Communications</h1>
                 <p className="text-gray-400 text-sm mt-1">
-                  Test centralized email and SMS delivery for any tenant
+                  Test centralized Brevo and Vonage integrations
                 </p>
               </div>
             </div>
@@ -202,11 +137,11 @@ export default function SuperAdminTestCommunications() {
               <div className="flex items-start gap-3">
                 <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="text-white font-medium mb-1">Centralized Communication System</h3>
+                  <h3 className="text-white font-medium mb-1">Internal Testing Tool</h3>
                   <p className="text-sm text-gray-400">
-                    All emails are sent through LoyaltyHub's Brevo account and all SMS messages through
-                    LoyaltyHub's Vonage account. Messages will appear to recipients as coming from LoyaltyHub,
-                    with tenant identification included in the message content via signature.
+                    This is an internal tool for super admins to verify that LoyaltyHub's Brevo and Vonage
+                    integrations are working correctly. Use this to test SMTP and SMS delivery without
+                    affecting tenant accounts or usage limits.
                   </p>
                 </div>
               </div>
@@ -253,31 +188,8 @@ export default function SuperAdminTestCommunications() {
               </div>
 
               <div className="p-6">
-                {loading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-                  </div>
-                ) : activeTab === 'email' ? (
+                {activeTab === 'email' ? (
                   <form onSubmit={handleSendEmail} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Select Tenant *
-                      </label>
-                      <select
-                        value={emailForm.businessId}
-                        onChange={(e) => handleBusinessChange(e.target.value)}
-                        className="w-full px-4 py-3 bg-black border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition"
-                        required
-                      >
-                        <option value="">-- Select a tenant --</option>
-                        {businesses.map((business) => (
-                          <option key={business.id} value={business.id}>
-                            {business.company_name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -288,6 +200,7 @@ export default function SuperAdminTestCommunications() {
                           value={emailForm.recipientEmail}
                           onChange={(e) => setEmailForm({ ...emailForm, recipientEmail: e.target.value })}
                           className="w-full px-4 py-3 bg-black border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition"
+                          placeholder="admin@example.com"
                           required
                         />
                       </div>
@@ -301,6 +214,7 @@ export default function SuperAdminTestCommunications() {
                           value={emailForm.recipientName}
                           onChange={(e) => setEmailForm({ ...emailForm, recipientName: e.target.value })}
                           className="w-full px-4 py-3 bg-black border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition"
+                          placeholder="Admin User"
                         />
                       </div>
                     </div>
@@ -331,26 +245,10 @@ export default function SuperAdminTestCommunications() {
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Tenant Signature
-                      </label>
-                      <textarea
-                        value={emailForm.tenantSignature}
-                        onChange={(e) => setEmailForm({ ...emailForm, tenantSignature: e.target.value })}
-                        rows={3}
-                        className="w-full px-4 py-3 bg-black border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition resize-none"
-                        placeholder="Automatically populated when you select a tenant"
-                      />
-                      <p className="text-xs text-gray-500 mt-1.5">
-                        This signature will be appended to the email body to identify the tenant
-                      </p>
-                    </div>
-
                     <div className="pt-2">
                       <button
                         type="submit"
-                        disabled={sending || !emailForm.businessId}
+                        disabled={sending}
                         className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition"
                       >
                         {sending ? (
@@ -372,31 +270,12 @@ export default function SuperAdminTestCommunications() {
                       <ul className="text-xs text-gray-400 space-y-1">
                         <li>Provider: <span className="text-orange-400">Brevo (LoyaltyHub Account)</span></li>
                         <li>From: Platform-configured email address</li>
-                        <li>Tracking: Managed at platform level</li>
+                        <li>Note: This test does not count against tenant limits</li>
                       </ul>
                     </div>
                   </form>
                 ) : (
                   <form onSubmit={handleSendSms} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Select Tenant *
-                      </label>
-                      <select
-                        value={smsForm.businessId}
-                        onChange={(e) => handleBusinessChange(e.target.value)}
-                        className="w-full px-4 py-3 bg-black border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition"
-                        required
-                      >
-                        <option value="">-- Select a tenant --</option>
-                        {businesses.map((business) => (
-                          <option key={business.id} value={business.id}>
-                            {business.company_name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
                         Recipient Phone Number *
@@ -430,26 +309,10 @@ export default function SuperAdminTestCommunications() {
                       </p>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Tenant Signature
-                      </label>
-                      <textarea
-                        value={smsForm.tenantSignature}
-                        onChange={(e) => setSmsForm({ ...smsForm, tenantSignature: e.target.value })}
-                        rows={2}
-                        className="w-full px-4 py-3 bg-black border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition resize-none"
-                        placeholder="Automatically populated when you select a tenant"
-                      />
-                      <p className="text-xs text-gray-500 mt-1.5">
-                        This signature will be appended to the SMS to identify the tenant
-                      </p>
-                    </div>
-
                     <div className="pt-2">
                       <button
                         type="submit"
-                        disabled={sending || !smsForm.businessId}
+                        disabled={sending}
                         className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition"
                       >
                         {sending ? (
@@ -471,7 +334,7 @@ export default function SuperAdminTestCommunications() {
                       <ul className="text-xs text-gray-400 space-y-1">
                         <li>Provider: <span className="text-orange-400">Vonage (LoyaltyHub Account)</span></li>
                         <li>From: Platform-configured phone number</li>
-                        <li>Delivery: Managed at platform level</li>
+                        <li>Note: This test does not count against tenant limits</li>
                       </ul>
                     </div>
                   </form>

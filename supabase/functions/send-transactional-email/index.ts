@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 interface SendEmailRequest {
-  businessId: string;
+  businessId?: string;
   customerId?: string | null;
   templateId?: string;
   templateName?: string;
@@ -16,6 +16,7 @@ interface SendEmailRequest {
   body: string;
   recipientEmail: string;
   recipientName?: string;
+  isTestEmail?: boolean;
 }
 
 interface EmailConfig {
@@ -227,9 +228,9 @@ Deno.serve(async (req: Request) => {
     }
 
     const emailRequest: SendEmailRequest = await req.json();
-    const { businessId, customerId, templateId, templateName, subject, body, recipientEmail, recipientName } = emailRequest;
+    const { businessId, customerId, templateId, templateName, subject, body, recipientEmail, recipientName, isTestEmail } = emailRequest;
 
-    if (!businessId || !subject || !body || !recipientEmail) {
+    if (!subject || !body || !recipientEmail) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
         {
@@ -239,51 +240,73 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: business, error: businessError } = await supabase
-      .from("businesses")
-      .select("tier_id, usage_email_monthly, email_tracking_enabled")
-      .eq("id", businessId)
-      .maybeSingle();
+    let business: any = null;
+    let emailTrackingEnabled = false;
 
-    if (businessError || !business) {
-      return new Response(
-        JSON.stringify({ error: "Business not found" }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+    if (isTestEmail) {
+      emailTrackingEnabled = false;
+    } else {
+      if (!businessId) {
+        return new Response(
+          JSON.stringify({ error: "Missing businessId for non-test email" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
 
-    const { data: tier } = await supabase
-      .from("subscription_tiers")
-      .select("features")
-      .eq("id", business.tier_id)
-      .maybeSingle();
+      const { data: businessData, error: businessError } = await supabase
+        .from("businesses")
+        .select("tier_id, usage_email_monthly, email_tracking_enabled")
+        .eq("id", businessId)
+        .maybeSingle();
 
-    const emailLimit = tier?.features?.email_monthly || 50;
+      if (businessError || !businessData) {
+        return new Response(
+          JSON.stringify({ error: "Business not found" }),
+          {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
 
-    if (business.usage_email_monthly >= emailLimit) {
-      return new Response(
-        JSON.stringify({ error: "Email quota exceeded for this billing period" }),
-        {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      business = businessData;
+      emailTrackingEnabled = business.email_tracking_enabled ?? false;
+
+      const { data: tier } = await supabase
+        .from("subscription_tiers")
+        .select("features")
+        .eq("id", business.tier_id)
+        .maybeSingle();
+
+      const emailLimit = tier?.features?.email_monthly || 50;
+
+      if (business.usage_email_monthly >= emailLimit) {
+        return new Response(
+          JSON.stringify({ error: "Email quota exceeded for this billing period" }),
+          {
+            status: 429,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
     }
 
     let emailConfig: EmailConfig = {};
 
-    const { data: integration } = await supabase
-      .from("integrations")
-      .select("email_config")
-      .eq("business_id", businessId)
-      .eq("active", true)
-      .maybeSingle();
+    if (businessId && !isTestEmail) {
+      const { data: integration } = await supabase
+        .from("integrations")
+        .select("email_config")
+        .eq("business_id", businessId)
+        .eq("active", true)
+        .maybeSingle();
 
-    if (integration?.email_config) {
-      emailConfig = integration.email_config as EmailConfig;
+      if (integration?.email_config) {
+        emailConfig = integration.email_config as EmailConfig;
+      }
     }
 
     const platformBrevoKey = Deno.env.get("BREVO_API_KEY");
@@ -315,7 +338,7 @@ Deno.serve(async (req: Request) => {
       ? body
       : convertPlainTextToHtml(body);
 
-    if (business.email_tracking_enabled) {
+    if (emailTrackingEnabled) {
       htmlBody = injectTrackingPixel(htmlBody, trackingToken, supabaseUrl);
     }
 
@@ -339,45 +362,47 @@ Deno.serve(async (req: Request) => {
           htmlBody
         );
 
-    const { error: logError } = await supabase
-      .from("communication_logs")
-      .insert({
-        business_id: businessId,
-        customer_id: customerId || null,
-        type: "email",
-        template_id: templateId || null,
-        template_name: templateName || null,
-        subject: subject,
-        content: body,
-        status: sendResult.success ? "sent" : "failed",
-        error_message: sendResult.error || null,
-        tracking_token: business.email_tracking_enabled ? trackingToken : null,
-        provider: useBrevo ? "brevo" : "sendgrid",
-        provider_message_id: sendResult.messageId || null,
-        metadata: {
-          recipient_email: recipientEmail,
-          recipient_name: recipientName,
-          from_email: fromEmail,
-          from_name: fromName,
-        },
-      });
+    if (!isTestEmail && businessId) {
+      const { error: logError } = await supabase
+        .from("communication_logs")
+        .insert({
+          business_id: businessId,
+          customer_id: customerId || null,
+          type: "email",
+          template_id: templateId || null,
+          template_name: templateName || null,
+          subject: subject,
+          content: body,
+          status: sendResult.success ? "sent" : "failed",
+          error_message: sendResult.error || null,
+          tracking_token: emailTrackingEnabled ? trackingToken : null,
+          provider: useBrevo ? "brevo" : "sendgrid",
+          provider_message_id: sendResult.messageId || null,
+          metadata: {
+            recipient_email: recipientEmail,
+            recipient_name: recipientName,
+            from_email: fromEmail,
+            from_name: fromName,
+          },
+        });
 
-    if (logError) {
-      console.error("Error logging email:", logError);
-    }
+      if (logError) {
+        console.error("Error logging email:", logError);
+      }
 
-    if (sendResult.success) {
-      await supabase.rpc("increment_business_usage", {
-        p_business_id: businessId,
-        p_column_name: "usage_email_monthly",
-      });
+      if (sendResult.success) {
+        await supabase.rpc("increment_business_usage", {
+          p_business_id: businessId,
+          p_column_name: "usage_email_monthly",
+        });
+      }
     }
 
     return new Response(
       JSON.stringify({
         success: sendResult.success,
         messageId: sendResult.messageId,
-        trackingToken: business.email_tracking_enabled ? trackingToken : null,
+        trackingToken: emailTrackingEnabled ? trackingToken : null,
         error: sendResult.error,
       }),
       {
