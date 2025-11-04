@@ -241,7 +241,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: business, error: businessError } = await supabase
       .from("businesses")
-      .select("subscription_tier_id, usage_email_monthly, email_tracking_enabled")
+      .select("tier_id, usage_email_monthly, email_tracking_enabled")
       .eq("id", businessId)
       .maybeSingle();
 
@@ -258,7 +258,7 @@ Deno.serve(async (req: Request) => {
     const { data: tier } = await supabase
       .from("subscription_tiers")
       .select("features")
-      .eq("id", business.subscription_tier_id)
+      .eq("id", business.tier_id)
       .maybeSingle();
 
     const emailLimit = tier?.features?.email_monthly || 50;
