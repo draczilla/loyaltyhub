@@ -19,9 +19,67 @@ interface SendEmailRequest {
 }
 
 interface EmailConfig {
+  brevoApiKey?: string;
   sendgridApiKey?: string;
   fromEmail?: string;
   fromName?: string;
+}
+
+async function sendEmailViaBrevo(
+  apiKey: string,
+  fromEmail: string,
+  fromName: string,
+  toEmail: string,
+  toName: string | undefined,
+  subject: string,
+  htmlContent: string
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  try {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "api-key": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        sender: {
+          email: fromEmail,
+          name: fromName,
+        },
+        to: [
+          {
+            email: toEmail,
+            name: toName || toEmail,
+          },
+        ],
+        subject: subject,
+        htmlContent: htmlContent,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Brevo API error:", errorText);
+      return {
+        success: false,
+        error: `Brevo API returned ${response.status}: ${errorText}`,
+      };
+    }
+
+    const responseData = await response.json();
+    const messageId = responseData.messageId;
+
+    return {
+      success: true,
+      messageId: messageId || undefined,
+    };
+  } catch (error) {
+    console.error("Error sending email via Brevo:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
 }
 
 async function sendEmailViaSendGrid(
@@ -224,21 +282,26 @@ Deno.serve(async (req: Request) => {
       .eq("active", true)
       .maybeSingle();
 
-    if (integration?.email_config?.sendgridApiKey) {
+    if (integration?.email_config) {
       emailConfig = integration.email_config as EmailConfig;
     }
 
+    const platformBrevoKey = Deno.env.get("BREVO_API_KEY");
     const platformSendGridKey = Deno.env.get("SENDGRID_API_KEY");
-    const platformFromEmail = Deno.env.get("SENDGRID_FROM_EMAIL");
-    const platformFromName = Deno.env.get("SENDGRID_FROM_NAME");
+    const platformFromEmail = Deno.env.get("EMAIL_FROM");
+    const platformFromName = Deno.env.get("EMAIL_FROM_NAME");
 
+    const brevoApiKey = emailConfig.brevoApiKey || platformBrevoKey;
     const sendgridApiKey = emailConfig.sendgridApiKey || platformSendGridKey;
     const fromEmail = emailConfig.fromEmail || platformFromEmail;
     const fromName = emailConfig.fromName || platformFromName;
 
-    if (!sendgridApiKey || !fromEmail || !fromName) {
+    const useBrevo = !!brevoApiKey;
+    const useSendGrid = !!sendgridApiKey;
+
+    if ((!useBrevo && !useSendGrid) || !fromEmail || !fromName) {
       return new Response(
-        JSON.stringify({ error: "Email configuration not found. Please configure SendGrid credentials." }),
+        JSON.stringify({ error: "Email configuration not found. Please configure Brevo or SendGrid credentials." }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -256,15 +319,25 @@ Deno.serve(async (req: Request) => {
       htmlBody = injectTrackingPixel(htmlBody, trackingToken, supabaseUrl);
     }
 
-    const sendResult = await sendEmailViaSendGrid(
-      sendgridApiKey,
-      fromEmail,
-      fromName,
-      recipientEmail,
-      recipientName,
-      subject,
-      htmlBody
-    );
+    const sendResult = useBrevo
+      ? await sendEmailViaBrevo(
+          brevoApiKey!,
+          fromEmail,
+          fromName,
+          recipientEmail,
+          recipientName,
+          subject,
+          htmlBody
+        )
+      : await sendEmailViaSendGrid(
+          sendgridApiKey!,
+          fromEmail,
+          fromName,
+          recipientEmail,
+          recipientName,
+          subject,
+          htmlBody
+        );
 
     const { error: logError } = await supabase
       .from("communication_logs")
@@ -279,7 +352,7 @@ Deno.serve(async (req: Request) => {
         status: sendResult.success ? "sent" : "failed",
         error_message: sendResult.error || null,
         tracking_token: business.email_tracking_enabled ? trackingToken : null,
-        provider: "sendgrid",
+        provider: useBrevo ? "brevo" : "sendgrid",
         provider_message_id: sendResult.messageId || null,
         metadata: {
           recipient_email: recipientEmail,
