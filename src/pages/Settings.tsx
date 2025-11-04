@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
-import { Menu, Mail, Save, AlertCircle, Check, TestTube, Eye, EyeOff, Shield, Info } from 'lucide-react';
+import { Menu, Mail, Save, AlertCircle, Check, Eye, EyeOff, Shield, Info } from 'lucide-react';
 
 interface EmailConfig {
   sendgridApiKey?: string;
@@ -15,7 +15,6 @@ export default function Settings() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
@@ -179,61 +178,6 @@ export default function Settings() {
     }
   };
 
-  const handleTestEmail = async () => {
-    if (!business) return;
-
-    setTesting(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('Not authenticated');
-      }
-
-      const { data: businessData } = await supabase
-        .from('businesses')
-        .select('name, email')
-        .eq('id', business.id)
-        .maybeSingle();
-
-      if (!businessData?.email) {
-        throw new Error('Business email not found');
-      }
-
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-transactional-email`;
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          businessId: business.id,
-          customerId: business.id,
-          subject: 'Test Email from LoyaltyHub',
-          body: `This is a test email from LoyaltyHub.\n\nYour email configuration is working correctly!\n\nBusiness: ${businessData.name}`,
-          recipientEmail: businessData.email,
-          recipientName: businessData.name,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || 'Failed to send test email');
-      }
-
-      setSuccess('Test email sent successfully! Check your inbox.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send test email');
-    } finally {
-      setTesting(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-black flex">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -284,6 +228,20 @@ export default function Settings() {
             </div>
           ) : (
             <div className="max-w-3xl space-y-6">
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="text-white font-medium mb-1">Centralized Communication System</h3>
+                    <p className="text-sm text-gray-400">
+                      All emails and SMS messages are sent through LoyaltyHub's Brevo and Vonage accounts.
+                      Communications will appear to recipients as coming from LoyaltyHub.
+                      Super admins can test email and SMS delivery through the admin panel.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                 <h2 className="text-xl font-bold text-white mb-4">Google OAuth Provider</h2>
                 <p className="text-gray-400 text-sm mb-6">
@@ -370,10 +328,22 @@ export default function Settings() {
               </div>
 
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                <h2 className="text-xl font-bold text-white mb-4">SendGrid Configuration</h2>
-                <p className="text-gray-400 text-sm mb-6">
-                  Configure your own SendGrid account for sending emails. Leave API key blank to use platform credentials.
-                </p>
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-white">SendGrid Configuration</h2>
+                    <p className="text-gray-400 text-sm mt-2">
+                      Configure your own SendGrid account for sending emails. Leave API key blank to use platform credentials.
+                    </p>
+                  </div>
+                  <span className="px-3 py-1 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-xs font-medium rounded-full">
+                    Deprecated
+                  </span>
+                </div>
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-6">
+                  <p className="text-sm text-yellow-400">
+                    Note: This configuration is for reference only. All emails are now sent through LoyaltyHub's centralized Brevo account.
+                  </p>
+                </div>
 
                 <div className="space-y-4">
                   <div>
@@ -435,7 +405,7 @@ export default function Settings() {
                     </p>
                   </div>
 
-                  <div className="flex gap-3 pt-2">
+                  <div className="pt-2">
                     <button
                       onClick={handleSaveEmailConfig}
                       disabled={saving}
@@ -450,24 +420,6 @@ export default function Settings() {
                         <>
                           <Save className="w-4 h-4" />
                           Save Configuration
-                        </>
-                      )}
-                    </button>
-
-                    <button
-                      onClick={handleTestEmail}
-                      disabled={testing || !emailConfig.fromEmail || !emailConfig.fromName}
-                      className="flex items-center gap-2 px-6 py-3 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition"
-                    >
-                      {testing ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          Sending...
-                        </>
-                      ) : (
-                        <>
-                          <TestTube className="w-4 h-4" />
-                          Send Test Email
                         </>
                       )}
                     </button>

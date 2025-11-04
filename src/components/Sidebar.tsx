@@ -15,8 +15,7 @@ import {
   Settings as SettingsIcon,
   History,
   Building2,
-  ShieldAlert,
-  TestTube
+  ShieldAlert
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -43,7 +42,6 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     { icon: MessageSquare, label: 'SMS Templates', path: '/sms-templates' },
     { icon: FileText, label: 'Email Templates', path: '/email-templates' },
     { icon: History, label: 'Communications', path: '/communications' },
-    { icon: TestTube, label: 'Test Email', path: '/test-email' },
     { icon: BarChart3, label: 'Analytics', path: '/analytics' },
     { icon: Building2, label: 'Company Profile', path: '/company' },
     { icon: SettingsIcon, label: 'Settings', path: '/settings' },

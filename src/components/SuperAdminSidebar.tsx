@@ -7,7 +7,8 @@ import {
   LogOut,
   X,
   CreditCard,
-  Shield
+  Shield,
+  Mail
 } from 'lucide-react';
 
 interface SuperAdminSidebarProps {
@@ -30,6 +31,7 @@ export default function SuperAdminSidebar({ open, onClose }: SuperAdminSidebarPr
     { icon: Users, label: 'Tenants', path: '/admin/tenants' },
     { icon: Settings, label: 'Platform Config', path: '/admin/config' },
     { icon: CreditCard, label: 'Credit Logs', path: '/admin/credits' },
+    { icon: Mail, label: 'Test Communications', path: '/admin/test-communications' },
   ];
 
   return (

@@ -20,11 +20,11 @@ import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import SuperAdminTenants from './pages/SuperAdminTenants';
 import SuperAdminConfig from './pages/SuperAdminConfig';
 import SuperAdminCredits from './pages/SuperAdminCredits';
+import SuperAdminTestCommunications from './pages/SuperAdminTestCommunications';
 import CustomerPortalLogin from './pages/CustomerPortalLogin';
 import CustomerDashboard from './pages/CustomerDashboard';
 import CompanyProfile from './pages/CompanyProfile';
 import AcceptInvitation from './pages/AcceptInvitation';
-import TestEmail from './pages/TestEmail';
 
 function App() {
   const { user, loading, isSuperAdmin } = useAuth();
@@ -134,15 +134,6 @@ function App() {
         }
       />
       <Route
-        path="/test-email"
-        element={
-          <ProtectedRoute>
-            <TestEmail />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
         path="/admin/dashboard"
         element={
           <SuperAdminProtectedRoute>
@@ -171,6 +162,14 @@ function App() {
         element={
           <SuperAdminProtectedRoute>
             <SuperAdminCredits />
+          </SuperAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/test-communications"
+        element={
+          <SuperAdminProtectedRoute>
+            <SuperAdminTestCommunications />
           </SuperAdminProtectedRoute>
         }
       />
