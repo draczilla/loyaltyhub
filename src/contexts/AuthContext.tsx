@@ -148,20 +148,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         console.warn('No business record found for user:', userId);
 
-        // Only create business for OAuth users (they have user_metadata)
-        // Regular email/password signups should already have a business record
-        const { data: { user } } = await supabase.auth.getUser();
-        const isOAuthUser = user?.app_metadata?.provider && user.app_metadata.provider !== 'email';
-
-        if (isOAuthUser) {
-          await createBusinessForOAuthUser(userId);
-        } else {
-          console.error('Email/password user missing business record - signup may have failed');
-          setBusiness(null);
-          setTenant(null);
-          setIsSuperAdmin(false);
-          setIsTenantAdmin(false);
-        }
+        // Create business for any user that doesn't have one
+        // This handles both OAuth users and email/password users whose signup was interrupted
+        await createBusinessForOAuthUser(userId);
       }
     } catch (error) {
       console.error('Exception loading business:', error);
