@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Menu, Send, Mail, MessageSquare, AlertCircle, Check, Info } from 'lucide-react';
+import { Menu, Send, Mail, MessageSquare, AlertCircle, Check, Info, ExternalLink, Key } from 'lucide-react';
 import SuperAdminSidebar from '../components/SuperAdminSidebar';
 import { supabase } from '../lib/supabase';
 
@@ -173,6 +173,35 @@ export default function SuperAdminTestCommunications() {
                 </div>
               </div>
             </div>
+
+            {platformSettings && !platformSettings.sms_provider_status?.brevo?.healthy && activeTab === 'sms' && (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-6">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="text-yellow-400 font-medium mb-2">Brevo Credentials Not Configured</h3>
+                    <p className="text-sm text-gray-400 mb-3">
+                      Brevo SMS credentials are not set up or are experiencing issues. Please configure them before testing.
+                    </p>
+                    <div className="space-y-2 text-sm text-gray-400">
+                      <div className="flex items-center gap-2">
+                        <Key className="w-4 h-4 text-yellow-400" />
+                        <span>Required secrets: <span className="text-white font-mono">BREVO_API_KEY</span> and <span className="text-white font-mono">BREVO_SMS_SENDER</span></span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <ExternalLink className="w-4 h-4 text-yellow-400" />
+                        <a
+                          href="/super-admin/config"
+                          className="text-blue-400 hover:text-blue-300 transition"
+                        >
+                          Go to Platform Configuration to set up Brevo credentials
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {error && (
               <div className="mb-6 bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex items-start gap-3">

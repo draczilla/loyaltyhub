@@ -359,13 +359,47 @@ Deno.serve(async (req: Request) => {
     const hasTwilio = !!(twilioSid && twilioToken && twilioPhone);
 
     if (!hasBrevo && !hasTwilio) {
+      console.error("SMS Provider Configuration Error: No providers configured");
+      console.error("Brevo Config:", { hasApiKey: !!brevoApiKey, hasSender: !!brevoSender });
+      console.error("Twilio Config:", { hasSid: !!twilioSid, hasToken: !!twilioToken, hasPhone: !!twilioPhone });
+
       return new Response(
-        JSON.stringify({ error: "No SMS provider configured. Please configure Brevo or Twilio credentials." }),
+        JSON.stringify({
+          error: "No SMS provider configured. Please configure Brevo or Twilio credentials in Supabase Edge Function secrets.",
+          details: {
+            brevo: {
+              apiKey: brevoApiKey ? "Set" : "Missing BREVO_API_KEY secret",
+              sender: brevoSender ? "Set" : "Missing BREVO_SMS_SENDER secret"
+            },
+            twilio: {
+              accountSid: twilioSid ? "Set" : "Missing TWILIO_ACCOUNT_SID secret",
+              authToken: twilioToken ? "Set" : "Missing TWILIO_AUTH_TOKEN secret",
+              phoneNumber: twilioPhone ? "Set" : "Missing TWILIO_PHONE_NUMBER secret"
+            }
+          }
+        }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
+    }
+
+    if (!hasBrevo) {
+      console.warn("Brevo SMS not configured:", {
+        hasApiKey: !!brevoApiKey,
+        hasSender: !!brevoSender,
+        message: "BREVO_API_KEY and BREVO_SMS_SENDER must be set in Supabase Edge Function secrets"
+      });
+    }
+
+    if (!hasTwilio) {
+      console.warn("Twilio SMS not configured:", {
+        hasSid: !!twilioSid,
+        hasToken: !!twilioToken,
+        hasPhone: !!twilioPhone,
+        message: "TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER must be set in Supabase Edge Function secrets"
+      });
     }
 
     let sendResult: SmsResult;

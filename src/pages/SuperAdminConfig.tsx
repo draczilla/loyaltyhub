@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Menu, Save, DollarSign, Package, MessageSquare, AlertCircle, Check, Phone, Mail } from 'lucide-react';
+import { Menu, Save, DollarSign, Package, MessageSquare, AlertCircle, Check, Phone, Mail, Key, ExternalLink, RefreshCw, Info } from 'lucide-react';
 import SuperAdminSidebar from '../components/SuperAdminSidebar';
 import { supabase } from '../lib/supabase';
 
@@ -38,6 +38,7 @@ export default function SuperAdminConfig() {
   const [alertEmail, setAlertEmail] = useState('');
   const [alertPhone, setAlertPhone] = useState('');
   const [savingSettings, setSavingSettings] = useState(false);
+  const [refreshingStatus, setRefreshingStatus] = useState(false);
 
   useEffect(() => {
     loadTiers();
@@ -129,6 +130,12 @@ export default function SuperAdminConfig() {
 
   const getTierValue = (tier: SubscriptionTier, field: keyof SubscriptionTier) => {
     return editedTiers[tier.id]?.[field] ?? tier[field];
+  };
+
+  const refreshProviderStatus = async () => {
+    setRefreshingStatus(true);
+    await loadPlatformSettings();
+    setTimeout(() => setRefreshingStatus(false), 500);
   };
 
   return (
@@ -327,6 +334,237 @@ export default function SuperAdminConfig() {
                         </>
                       )}
                     </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-500/10 rounded-lg">
+                      <Key className="w-5 h-5 text-green-400" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-white">Brevo SMS Credentials</h2>
+                      <p className="text-sm text-gray-400">Manage platform-level Brevo SMS configuration</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={refreshProviderStatus}
+                    disabled={refreshingStatus}
+                    className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white rounded-lg transition disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${refreshingStatus ? 'animate-spin' : ''}`} />
+                    Refresh Status
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                      <div className="space-y-2 text-sm text-gray-400">
+                        <p className="text-white font-medium">Unified Platform Account</p>
+                        <p>
+                          This is a centralized Brevo account used by all tenants for sending SMS messages.
+                          Credentials are securely stored in Supabase Edge Function secrets.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-black/50 border border-zinc-800 rounded-lg p-6">
+                      <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                        <Key className="w-4 h-4" />
+                        Credential Status
+                      </h3>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-700 rounded-lg">
+                          <div>
+                            <div className="text-sm font-medium text-gray-300">BREVO_API_KEY</div>
+                            <div className="text-xs text-gray-500 mt-1">Brevo API authentication key</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {platformSettings?.sms_provider_status?.brevo?.healthy !== undefined ? (
+                              platformSettings.sms_provider_status.brevo.healthy ? (
+                                <>
+                                  <Check className="w-5 h-5 text-green-400" />
+                                  <span className="text-sm text-green-400">Configured</span>
+                                </>
+                              ) : (
+                                <>
+                                  <AlertCircle className="w-5 h-5 text-yellow-400" />
+                                  <span className="text-sm text-yellow-400">Check Config</span>
+                                </>
+                              )
+                            ) : (
+                              <>
+                                <AlertCircle className="w-5 h-5 text-red-400" />
+                                <span className="text-sm text-red-400">Not Set</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-700 rounded-lg">
+                          <div>
+                            <div className="text-sm font-medium text-gray-300">BREVO_SMS_SENDER</div>
+                            <div className="text-xs text-gray-500 mt-1">SMS sender ID or phone number</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {platformSettings?.sms_provider_status?.brevo?.healthy !== undefined ? (
+                              platformSettings.sms_provider_status.brevo.healthy ? (
+                                <>
+                                  <Check className="w-5 h-5 text-green-400" />
+                                  <span className="text-sm text-green-400">Configured</span>
+                                </>
+                              ) : (
+                                <>
+                                  <AlertCircle className="w-5 h-5 text-yellow-400" />
+                                  <span className="text-sm text-yellow-400">Check Config</span>
+                                </>
+                              )
+                            ) : (
+                              <>
+                                <AlertCircle className="w-5 h-5 text-red-400" />
+                                <span className="text-sm text-red-400">Not Set</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {platformSettings?.sms_provider_status?.brevo && (
+                        <div className="mt-4 pt-4 border-t border-zinc-700">
+                          <h4 className="text-sm font-semibold text-white mb-3">Provider Health</h4>
+                          <div className="space-y-2 text-xs">
+                            <div className="flex items-center justify-between">
+                              <span className="text-gray-400">Status:</span>
+                              <span className={platformSettings.sms_provider_status.brevo.healthy ? 'text-green-400' : 'text-red-400'}>
+                                {platformSettings.sms_provider_status.brevo.healthy ? 'Healthy' : 'Unhealthy'}
+                              </span>
+                            </div>
+                            {platformSettings.sms_provider_status.brevo.last_success_at && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-gray-400">Last Success:</span>
+                                <span className="text-gray-300">
+                                  {new Date(platformSettings.sms_provider_status.brevo.last_success_at).toLocaleString()}
+                                </span>
+                              </div>
+                            )}
+                            {platformSettings.sms_provider_status.brevo.failure_count > 0 && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-gray-400">Failure Count:</span>
+                                <span className="text-orange-400">{platformSettings.sms_provider_status.brevo.failure_count}</span>
+                              </div>
+                            )}
+                            {platformSettings.sms_provider_status.brevo.last_error && (
+                              <div className="mt-2 p-2 bg-red-500/10 border border-red-500/20 rounded">
+                                <div className="text-red-400 break-words">{platformSettings.sms_provider_status.brevo.last_error}</div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="bg-black/50 border border-zinc-800 rounded-lg p-6">
+                      <h3 className="text-white font-bold mb-4">Setup Instructions</h3>
+                      <div className="space-y-4 text-sm text-gray-400">
+                        <div>
+                          <div className="text-white font-medium mb-2 flex items-center gap-2">
+                            <span className="flex items-center justify-center w-6 h-6 bg-orange-500/20 text-orange-400 rounded-full text-xs">1</span>
+                            Get Brevo Credentials
+                          </div>
+                          <p className="ml-8">
+                            Log in to your Brevo account and navigate to:
+                            <br />
+                            <span className="text-orange-400">SMTP & API → API Keys</span>
+                          </p>
+                          <a
+                            href="https://app.brevo.com/settings/keys/api"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="ml-8 mt-2 inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 transition"
+                          >
+                            Open Brevo Dashboard
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+
+                        <div>
+                          <div className="text-white font-medium mb-2 flex items-center gap-2">
+                            <span className="flex items-center justify-center w-6 h-6 bg-orange-500/20 text-orange-400 rounded-full text-xs">2</span>
+                            Configure SMS Sender
+                          </div>
+                          <p className="ml-8">
+                            Your sender can be:
+                            <br />
+                            • Phone number in E.164 format (e.g., +12345678900)
+                            <br />
+                            • Alphanumeric sender ID (e.g., YourBrand)
+                          </p>
+                        </div>
+
+                        <div>
+                          <div className="text-white font-medium mb-2 flex items-center gap-2">
+                            <span className="flex items-center justify-center w-6 h-6 bg-orange-500/20 text-orange-400 rounded-full text-xs">3</span>
+                            Add to Supabase Secrets
+                          </div>
+                          <p className="ml-8">
+                            Navigate to your Supabase project:
+                            <br />
+                            <span className="text-orange-400">Project Settings → Edge Functions → Secrets</span>
+                          </p>
+                          <div className="ml-8 mt-2 space-y-2">
+                            <div className="bg-zinc-900 border border-zinc-700 rounded p-2 font-mono text-xs">
+                              <div className="text-gray-500">Name:</div>
+                              <div className="text-white">BREVO_API_KEY</div>
+                            </div>
+                            <div className="bg-zinc-900 border border-zinc-700 rounded p-2 font-mono text-xs">
+                              <div className="text-gray-500">Name:</div>
+                              <div className="text-white">BREVO_SMS_SENDER</div>
+                            </div>
+                          </div>
+                          <a
+                            href={`${import.meta.env.VITE_SUPABASE_URL?.replace('//', '//app.').replace('.supabase.co', '.supabase.com')}/project/_/settings/functions`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="ml-8 mt-2 inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 transition"
+                          >
+                            Open Supabase Secrets
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+
+                        <div>
+                          <div className="text-white font-medium mb-2 flex items-center gap-2">
+                            <span className="flex items-center justify-center w-6 h-6 bg-orange-500/20 text-orange-400 rounded-full text-xs">4</span>
+                            Test Configuration
+                          </div>
+                          <p className="ml-8">
+                            Use the Test Communications page to verify your Brevo credentials are working correctly.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-gray-400">
+                        <p className="text-yellow-400 font-medium mb-1">Important Notes:</p>
+                        <ul className="space-y-1 list-disc list-inside">
+                          <li>Credentials are stored securely in Supabase Edge Function secrets</li>
+                          <li>Changes to secrets require Edge Functions to restart (automatic)</li>
+                          <li>Always test after updating credentials to ensure they work</li>
+                          <li>Alphanumeric sender IDs may require pre-registration in some countries</li>
+                          <li>Keep your API key secure and never share it publicly</li>
+                        </ul>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
