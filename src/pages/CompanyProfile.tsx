@@ -34,7 +34,7 @@ interface SeatInfo {
 }
 
 export default function CompanyProfile() {
-  const { business, tenant, isTenantAdmin } = useAuth();
+  const { business, tenant, isTenantAdmin, user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -47,10 +47,63 @@ export default function CompanyProfile() {
   const [inviting, setInviting] = useState(false);
 
   useEffect(() => {
-    if (tenant && business) {
+    if (business && !tenant) {
+      // User doesn't have a tenant yet - create one
+      createTenantForExistingUser();
+    } else if (tenant && business) {
       loadTeamData();
     }
   }, [tenant, business]);
+
+  const createTenantForExistingUser = async () => {
+    if (!business) return;
+
+    setLoading(true);
+    try {
+      // Create tenant for existing user
+      const { data: newTenant, error: tenantError } = await supabase
+        .from('tenants')
+        .insert({
+          company_name: business.company_name,
+          admin_user_id: business.id,
+        })
+        .select()
+        .single();
+
+      if (tenantError) throw tenantError;
+
+      // Update business with tenant_id
+      const { error: updateError } = await supabase
+        .from('businesses')
+        .update({
+          tenant_id: newTenant.id,
+          is_tenant_admin: true,
+        })
+        .eq('id', business.id);
+
+      if (updateError) throw updateError;
+
+      // Create tenant member record
+      await supabase.from('tenant_members').insert({
+        tenant_id: newTenant.id,
+        user_id: business.id,
+        role: 'admin',
+        status: 'active',
+        accepted_at: new Date().toISOString(),
+      });
+
+      // Force auth context to reload by refetching session
+      if (user) {
+        // Small delay to ensure database writes are complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+        window.location.reload();
+      }
+    } catch (err) {
+      console.error('Error creating tenant:', err);
+      setError(err instanceof Error ? err.message : 'Failed to initialize company profile');
+      setLoading(false);
+    }
+  };
 
   const loadTeamData = async () => {
     if (!tenant || !business) return;
@@ -312,7 +365,26 @@ export default function CompanyProfile() {
 
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+              <div className="text-center">
+                <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-gray-400">Setting up your company profile...</p>
+              </div>
+            </div>
+          ) : !tenant ? (
+            <div className="max-w-2xl mx-auto">
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-6 text-center">
+                <AlertCircle className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-white mb-2">Company Profile Not Available</h3>
+                <p className="text-gray-400 mb-4">
+                  Your account needs to be migrated to the new company profile system.
+                </p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition"
+                >
+                  Retry Setup
+                </button>
+              </div>
             </div>
           ) : (
             <div className="max-w-5xl mx-auto space-y-6">
