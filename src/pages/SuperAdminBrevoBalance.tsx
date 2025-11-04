@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Menu, RefreshCw, Mail, MessageSquare, DollarSign, TrendingDown, AlertCircle, ExternalLink, Check, X, Clock } from 'lucide-react';
+import { Menu, RefreshCw, Mail, MessageSquare, DollarSign, TrendingDown, AlertCircle, ExternalLink, Check, X, Clock, Calendar } from 'lucide-react';
 import SuperAdminSidebar from '../components/SuperAdminSidebar';
 import { supabase } from '../lib/supabase';
 
@@ -31,6 +31,23 @@ interface PlatformSettings {
   };
   balance_monitoring_enabled: boolean;
   last_balance_check: string | null;
+  daily_email_limit: number;
+  daily_email_warning_threshold: number;
+}
+
+interface DailyAllowance {
+  sent_today: number;
+  remaining_today: number;
+  daily_limit: number;
+  warning_threshold: number;
+  percentage_used: number;
+  reset_time: string;
+}
+
+interface DailyStats {
+  date: string;
+  email_count: number;
+  percentage_of_limit: number;
 }
 
 export default function SuperAdminBrevoBalance() {
@@ -38,6 +55,8 @@ export default function SuperAdminBrevoBalance() {
   const [balance, setBalance] = useState<BalanceData | null>(null);
   const [history, setHistory] = useState<BalanceHistory[]>([]);
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null);
+  const [dailyAllowance, setDailyAllowance] = useState<DailyAllowance | null>(null);
+  const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -52,6 +71,8 @@ export default function SuperAdminBrevoBalance() {
       loadPlatformSettings(),
       loadBalanceHistory(),
       fetchCurrentBalance(),
+      loadDailyAllowance(),
+      loadDailyStats(),
     ]);
     setLoading(false);
   };
@@ -59,12 +80,36 @@ export default function SuperAdminBrevoBalance() {
   const loadPlatformSettings = async () => {
     const { data } = await supabase
       .from('platform_settings')
-      .select('balance_thresholds, balance_monitoring_enabled, last_balance_check')
+      .select('balance_thresholds, balance_monitoring_enabled, last_balance_check, daily_email_limit, daily_email_warning_threshold')
       .limit(1)
       .maybeSingle();
 
     if (data) {
       setPlatformSettings(data);
+    }
+  };
+
+  const loadDailyAllowance = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_daily_email_allowance').maybeSingle();
+      if (error) throw error;
+      if (data) {
+        setDailyAllowance(data);
+      }
+    } catch (err) {
+      console.error('Error loading daily allowance:', err);
+    }
+  };
+
+  const loadDailyStats = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_daily_email_stats', { p_days: 30 });
+      if (error) throw error;
+      if (data) {
+        setDailyStats(data);
+      }
+    } catch (err) {
+      console.error('Error loading daily stats:', err);
     }
   };
 
@@ -115,6 +160,8 @@ export default function SuperAdminBrevoBalance() {
     setError('');
     await fetchCurrentBalance();
     await loadBalanceHistory();
+    await loadDailyAllowance();
+    await loadDailyStats();
     setRefreshing(false);
   };
 
@@ -229,6 +276,94 @@ export default function SuperAdminBrevoBalance() {
             </div>
           ) : (
             <div className="space-y-6">
+              {dailyAllowance && (
+                <div className="bg-gradient-to-br from-orange-500/10 to-orange-600/5 border border-orange-500/20 rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-lg bg-orange-500/20">
+                        <Calendar className="w-6 h-6 text-orange-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-white">Daily Email Allowance</h3>
+                        <p className="text-sm text-gray-400">Brevo free tier: 300 transactional emails per day</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex items-baseline gap-2 mb-2">
+                        <div className="text-5xl font-bold text-white">
+                          {dailyAllowance.remaining_today}
+                        </div>
+                        <div className="text-2xl text-gray-400">left of {dailyAllowance.daily_limit} daily</div>
+                      </div>
+                      <div className="text-sm text-gray-400">
+                        {dailyAllowance.sent_today} emails sent today ({dailyAllowance.percentage_used}% used)
+                      </div>
+                    </div>
+
+                    <div className="relative pt-1">
+                      <div className="flex mb-2 items-center justify-between">
+                        <div>
+                          <span className={`text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full ${
+                            dailyAllowance.percentage_used >= 100
+                              ? 'text-red-400 bg-red-500/10'
+                              : dailyAllowance.percentage_used >= 83
+                              ? 'text-yellow-400 bg-yellow-500/10'
+                              : 'text-green-400 bg-green-500/10'
+                          }`}>
+                            {dailyAllowance.percentage_used >= 100 ? 'Limit Reached' : dailyAllowance.percentage_used >= 83 ? 'Warning' : 'Healthy'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="overflow-hidden h-4 text-xs flex rounded-lg bg-zinc-800">
+                        <div
+                          style={{ width: `${Math.min(dailyAllowance.percentage_used, 100)}%` }}
+                          className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center transition-all duration-500 ${
+                            dailyAllowance.percentage_used >= 100
+                              ? 'bg-red-500'
+                              : dailyAllowance.percentage_used >= 83
+                              ? 'bg-yellow-500'
+                              : 'bg-green-500'
+                          }`}
+                        ></div>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-orange-500/20">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-400">Resets at midnight UTC:</span>
+                        <span className="text-white font-medium">
+                          {new Date(dailyAllowance.reset_time).toLocaleTimeString('en-US', {
+                            timeZone: 'UTC',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            timeZoneName: 'short'
+                          })}
+                        </span>
+                      </div>
+                      {dailyAllowance.percentage_used >= 83 && dailyAllowance.remaining_today > 0 && (
+                        <div className="mt-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
+                          <p className="text-yellow-400 text-xs">
+                            Approaching daily limit. {dailyAllowance.remaining_today} emails remaining until reset.
+                          </p>
+                        </div>
+                      )}
+                      {dailyAllowance.remaining_today === 0 && (
+                        <div className="mt-3 bg-red-500/10 border border-red-500/20 rounded-lg p-3 flex items-start gap-2">
+                          <X className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                          <p className="text-red-400 text-xs">
+                            Daily email limit reached. No more emails can be sent until midnight UTC.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className={`bg-zinc-900 border rounded-xl p-6 ${emailHealth?.borderColor}`}>
                   <div className="flex items-center justify-between mb-4">
@@ -419,6 +554,71 @@ export default function SuperAdminBrevoBalance() {
 
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 bg-blue-500/10 rounded-lg">
+                    <TrendingDown className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Daily Email Usage History</h3>
+                    <p className="text-sm text-gray-400">Last 30 days of email sends</p>
+                  </div>
+                </div>
+
+                {dailyStats.length === 0 ? (
+                  <p className="text-center text-gray-400 py-8">No email history available yet</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-black/50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                            Date
+                          </th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
+                            Emails Sent
+                          </th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
+                            % of Daily Limit
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-800">
+                        {dailyStats.map((stat) => (
+                          <tr key={stat.date} className="hover:bg-zinc-800/50 transition">
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <div className="text-sm text-white">
+                                {new Date(stat.date).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric'
+                                })}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-right">
+                              <div className="text-sm text-white font-medium">
+                                {stat.email_count}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-right">
+                              <div className={`text-sm font-medium ${
+                                stat.percentage_of_limit >= 100
+                                  ? 'text-red-400'
+                                  : stat.percentage_of_limit >= 83
+                                  ? 'text-yellow-400'
+                                  : 'text-green-400'
+                              }`}>
+                                {stat.percentage_of_limit}%
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                <div className="flex items-center gap-3 mb-6">
                   <div className="p-2 bg-green-500/10 rounded-lg">
                     <TrendingDown className="w-5 h-5 text-green-400" />
                   </div>
@@ -489,11 +689,12 @@ export default function SuperAdminBrevoBalance() {
                   <div className="text-sm text-gray-400">
                     <p className="text-blue-400 font-medium mb-2">Important Information:</p>
                     <ul className="space-y-1 list-disc list-inside">
+                      <li>Daily email allowance resets at midnight UTC every day</li>
+                      <li>Brevo free tier includes 300 transactional emails per day</li>
+                      <li>Warning threshold is set at 250 emails (83% of daily limit)</li>
+                      <li>All sent emails are tracked in real-time from communication logs</li>
                       <li>Balance is automatically synced every hour when monitoring is enabled</li>
                       <li>Use the Refresh button to manually fetch the latest balance from Brevo</li>
-                      <li>Alerts are sent when balance falls below configured thresholds</li>
-                      <li>Daily usage is calculated from the last 7 days of history</li>
-                      <li>Days remaining is an estimate based on recent usage patterns</li>
                     </ul>
                   </div>
                 </div>

@@ -35,10 +35,12 @@ export default function SuperAdminDashboard() {
   const [recentTenants, setRecentTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [brevoBalance, setBrevoBalance] = useState<any>(null);
+  const [dailyAllowance, setDailyAllowance] = useState<any>(null);
 
   useEffect(() => {
     loadDashboardData();
     loadBrevoBalance();
+    loadDailyAllowance();
   }, []);
 
   const loadBrevoBalance = async () => {
@@ -51,6 +53,18 @@ export default function SuperAdminDashboard() {
 
     if (data) {
       setBrevoBalance(data);
+    }
+  };
+
+  const loadDailyAllowance = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_daily_email_allowance').maybeSingle();
+      if (error) throw error;
+      if (data) {
+        setDailyAllowance(data);
+      }
+    } catch (err) {
+      console.error('Error loading daily allowance:', err);
     }
   };
 
@@ -244,14 +258,14 @@ export default function SuperAdminDashboard() {
                 </div>
               </div>
 
-              {brevoBalance && (
+              {dailyAllowance && (
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-orange-500/10 rounded-lg">
                         <Mail className="w-5 h-5 text-orange-400" />
                       </div>
-                      <h3 className="text-lg font-bold text-white">Brevo Balance</h3>
+                      <h3 className="text-lg font-bold text-white">Daily Email Allowance</h3>
                     </div>
                     <button
                       onClick={() => navigate('/admin/brevo-balance')}
@@ -261,29 +275,52 @@ export default function SuperAdminDashboard() {
                       <ExternalLink className="w-4 h-4" />
                     </button>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Mail className="w-4 h-4 text-blue-400" />
-                        <span className="text-sm text-gray-400">Email Credits</span>
+                  <div className="mb-4">
+                    <div className="flex items-baseline gap-2 mb-2">
+                      <div className="text-3xl font-bold text-white">
+                        {dailyAllowance.remaining_today}
                       </div>
-                      <div className="text-2xl font-bold text-white">
-                        {brevoBalance.email_credits.toLocaleString()}
-                      </div>
+                      <div className="text-lg text-gray-400">left of {dailyAllowance.daily_limit} daily</div>
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <MessageSquare className="w-4 h-4 text-orange-400" />
-                        <span className="text-sm text-gray-400">SMS Credits</span>
-                      </div>
-                      <div className="text-2xl font-bold text-white">
-                        {brevoBalance.sms_credits.toLocaleString()}
-                      </div>
+                    <div className="text-sm text-gray-400">
+                      {dailyAllowance.sent_today} emails sent today
                     </div>
                   </div>
-                  <div className="mt-4 pt-4 border-t border-zinc-800 text-xs text-gray-500">
-                    Last updated: {new Date(brevoBalance.last_sync_at).toLocaleString()}
+                  <div className="relative pt-1">
+                    <div className="overflow-hidden h-3 text-xs flex rounded-lg bg-zinc-800">
+                      <div
+                        style={{ width: `${Math.min(dailyAllowance.percentage_used, 100)}%` }}
+                        className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center transition-all ${
+                          dailyAllowance.percentage_used >= 100
+                            ? 'bg-red-500'
+                            : dailyAllowance.percentage_used >= 83
+                            ? 'bg-yellow-500'
+                            : 'bg-green-500'
+                        }`}
+                      ></div>
+                    </div>
                   </div>
+                  {brevoBalance && (
+                    <div className="mt-4 pt-4 border-t border-zinc-800">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <MessageSquare className="w-3 h-3 text-orange-400" />
+                            <span className="text-xs text-gray-400">SMS Credits</span>
+                          </div>
+                          <div className="text-lg font-bold text-white">
+                            {brevoBalance.sms_credits.toLocaleString()}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-400 mb-1">Last updated</div>
+                          <div className="text-xs text-gray-500">
+                            {new Date(brevoBalance.last_sync_at).toLocaleTimeString()}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

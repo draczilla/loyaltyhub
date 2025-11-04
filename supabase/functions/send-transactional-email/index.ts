@@ -240,6 +240,30 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    if (!isTestEmail) {
+      const { data: allowanceData, error: allowanceError } = await supabase
+        .rpc("get_daily_email_allowance")
+        .maybeSingle();
+
+      if (allowanceError) {
+        console.error("Error checking daily allowance:", allowanceError);
+      } else if (allowanceData && allowanceData.remaining_today <= 0) {
+        return new Response(
+          JSON.stringify({
+            error: "Daily email limit reached",
+            message: `Daily limit of ${allowanceData.daily_limit} emails has been reached. Limit resets at midnight UTC.`,
+            sent_today: allowanceData.sent_today,
+            daily_limit: allowanceData.daily_limit,
+            reset_time: allowanceData.reset_time,
+          }),
+          {
+            status: 429,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+
     let business: any = null;
     let emailTrackingEnabled = false;
 
