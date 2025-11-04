@@ -147,7 +147,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } else {
         console.warn('No business record found for user:', userId);
-        await createBusinessForOAuthUser(userId);
+
+        // Only create business for OAuth users (they have user_metadata)
+        // Regular email/password signups should already have a business record
+        const { data: { user } } = await supabase.auth.getUser();
+        const isOAuthUser = user?.app_metadata?.provider && user.app_metadata.provider !== 'email';
+
+        if (isOAuthUser) {
+          await createBusinessForOAuthUser(userId);
+        } else {
+          console.error('Email/password user missing business record - signup may have failed');
+          setBusiness(null);
+          setTenant(null);
+          setIsSuperAdmin(false);
+          setIsTenantAdmin(false);
+        }
       }
     } catch (error) {
       console.error('Exception loading business:', error);
@@ -213,18 +227,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const companyName = user.user_metadata?.full_name || user.email.split('@')[0];
 
-      // Create tenant first
-      const { data: newTenant, error: tenantError } = await supabase
+      // Check if tenant already exists for this user
+      const { data: existingTenant } = await supabase
         .from('tenants')
-        .insert({
-          company_name: companyName,
-          admin_user_id: userId,
-        })
-        .select()
-        .single();
+        .select('*')
+        .eq('admin_user_id', userId)
+        .maybeSingle();
 
-      if (tenantError) {
-        console.error('Error creating tenant for OAuth user:', tenantError);
+      let tenantToUse = existingTenant;
+
+      // Create tenant only if it doesn't exist
+      if (!existingTenant) {
+        const { data: newTenant, error: tenantError } = await supabase
+          .from('tenants')
+          .insert({
+            company_name: companyName,
+            admin_user_id: userId,
+          })
+          .select()
+          .single();
+
+        if (tenantError) {
+          console.error('Error creating tenant for OAuth user:', tenantError);
+          setBusiness(null);
+          setTenant(null);
+          setIsSuperAdmin(false);
+          setIsTenantAdmin(false);
+          return;
+        }
+
+        tenantToUse = newTenant;
+      }
+
+      if (!tenantToUse) {
+        console.error('No tenant available for OAuth user');
         setBusiness(null);
         setTenant(null);
         setIsSuperAdmin(false);
@@ -243,7 +279,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           subscription_status: 'trial',
           usage_customers: 0,
           usage_sms_monthly: 0,
-          tenant_id: newTenant.id,
+          tenant_id: tenantToUse.id,
           is_tenant_admin: true,
         })
         .select()
@@ -258,13 +294,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else if (newBusiness) {
         console.log('Created business for OAuth user:', newBusiness);
         setBusiness(newBusiness);
-        setTenant(newTenant);
+        setTenant(tenantToUse);
         setIsSuperAdmin(false);
         setIsTenantAdmin(true);
 
         // Create tenant member record
         await supabase.from('tenant_members').insert({
-          tenant_id: newTenant.id,
+          tenant_id: tenantToUse.id,
           user_id: userId,
           role: 'admin',
           status: 'active',
@@ -290,52 +326,77 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: authError };
     }
 
-    // Create tenant first
-    const { data: newTenant, error: tenantError } = await supabase
+    // Check if tenant already exists for this user
+    const { data: existingTenant } = await supabase
       .from('tenants')
-      .insert({
-        company_name: companyName,
-        admin_user_id: authData.user.id,
-      })
-      .select()
-      .single();
+      .select('*')
+      .eq('admin_user_id', authData.user.id)
+      .maybeSingle();
 
-    if (tenantError) {
-      return { error: tenantError as any };
+    let tenantToUse = existingTenant;
+
+    // Create tenant only if it doesn't exist
+    if (!existingTenant) {
+      const { data: newTenant, error: tenantError } = await supabase
+        .from('tenants')
+        .insert({
+          company_name: companyName,
+          admin_user_id: authData.user.id,
+        })
+        .select()
+        .single();
+
+      if (tenantError) {
+        return { error: tenantError as any };
+      }
+
+      tenantToUse = newTenant;
     }
 
-    // Create business linked to tenant
-    const { error: businessError } = await supabase
+    const { data: existingBusiness } = await supabase
       .from('businesses')
-      .insert({
-        id: authData.user.id,
-        company_name: companyName,
-        email,
-        tier_id: tierId,
-        subscription_status: 'trial',
-        usage_customers: 0,
-        usage_sms_monthly: 0,
-        tenant_id: newTenant.id,
-        is_tenant_admin: true,
-      });
+      .select('*')
+      .eq('id', authData.user.id)
+      .maybeSingle();
 
-    if (businessError) {
-      return { error: businessError as any };
+    if (!tenantToUse) {
+      return { error: { message: 'Failed to create or find tenant' } as any };
     }
 
-    // Create tenant member record
-    const { error: memberError } = await supabase
-      .from('tenant_members')
-      .insert({
-        tenant_id: newTenant.id,
-        user_id: authData.user.id,
-        role: 'admin',
-        status: 'active',
-        accepted_at: new Date().toISOString(),
-      });
+    // Create business only if it doesn't exist
+    if (!existingBusiness) {
+      const { error: businessError } = await supabase
+        .from('businesses')
+        .insert({
+          id: authData.user.id,
+          company_name: companyName,
+          email,
+          tier_id: tierId,
+          subscription_status: 'trial',
+          usage_customers: 0,
+          usage_sms_monthly: 0,
+          tenant_id: tenantToUse.id,
+          is_tenant_admin: true,
+        });
 
-    if (memberError) {
-      console.error('Error creating tenant member:', memberError);
+      if (businessError) {
+        return { error: businessError as any };
+      }
+
+      // Create tenant member record
+      const { error: memberError } = await supabase
+        .from('tenant_members')
+        .insert({
+          tenant_id: tenantToUse.id,
+          user_id: authData.user.id,
+          role: 'admin',
+          status: 'active',
+          accepted_at: new Date().toISOString(),
+        });
+
+      if (memberError) {
+        console.error('Error creating tenant member:', memberError);
+      }
     }
 
     return { error: null };
