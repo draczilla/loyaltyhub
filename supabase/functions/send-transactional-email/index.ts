@@ -9,7 +9,7 @@ const corsHeaders = {
 
 interface SendEmailRequest {
   businessId: string;
-  customerId: string;
+  customerId?: string | null;
   templateId?: string;
   templateName?: string;
   subject: string;
@@ -229,7 +229,7 @@ Deno.serve(async (req: Request) => {
     const emailRequest: SendEmailRequest = await req.json();
     const { businessId, customerId, templateId, templateName, subject, body, recipientEmail, recipientName } = emailRequest;
 
-    if (!businessId || !customerId || !subject || !body || !recipientEmail) {
+    if (!businessId || !subject || !body || !recipientEmail) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
         {
@@ -343,7 +343,7 @@ Deno.serve(async (req: Request) => {
       .from("communication_logs")
       .insert({
         business_id: businessId,
-        customer_id: customerId,
+        customer_id: customerId || null,
         type: "email",
         template_id: templateId || null,
         template_name: templateName || null,

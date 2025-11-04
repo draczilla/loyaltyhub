@@ -26,6 +26,7 @@ export default function TestEmail() {
     setSuccess(false);
 
     try {
+      let customerId = null;
       const { data: customers } = await supabase
         .from('customers')
         .select('id')
@@ -33,8 +34,8 @@ export default function TestEmail() {
         .limit(1)
         .maybeSingle();
 
-      if (!customers) {
-        throw new Error('No customers found. Please add a customer first.');
+      if (customers) {
+        customerId = customers.id;
       }
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-transactional-email`;
@@ -52,7 +53,7 @@ export default function TestEmail() {
         },
         body: JSON.stringify({
           businessId: business.id,
-          customerId: customers.id,
+          customerId: customerId,
           subject: formData.subject,
           body: formData.body,
           recipientEmail: formData.recipientEmail,
