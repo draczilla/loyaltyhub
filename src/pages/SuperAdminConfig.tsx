@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Menu, Save, DollarSign, Package, MessageSquare, AlertCircle, Check, Phone, Mail, Key, ExternalLink, RefreshCw, Info } from 'lucide-react';
+import { Menu, Save, DollarSign, Package, MessageSquare, AlertCircle, Check, Phone, Mail, Key, ExternalLink, RefreshCw, Info, Bell, TrendingDown } from 'lucide-react';
 import SuperAdminSidebar from '../components/SuperAdminSidebar';
 import { supabase } from '../lib/supabase';
 
@@ -24,6 +24,12 @@ interface PlatformSettings {
   alert_phone: string | null;
   last_provider_switch_at: string | null;
   provider_switch_count: number;
+  balance_thresholds: {
+    email_credits: number;
+    sms_credits: number;
+  };
+  balance_monitoring_enabled: boolean;
+  last_balance_check: string | null;
 }
 
 export default function SuperAdminConfig() {
@@ -39,6 +45,9 @@ export default function SuperAdminConfig() {
   const [alertPhone, setAlertPhone] = useState('');
   const [savingSettings, setSavingSettings] = useState(false);
   const [refreshingStatus, setRefreshingStatus] = useState(false);
+  const [emailThreshold, setEmailThreshold] = useState(1000);
+  const [smsThreshold, setSmsThreshold] = useState(500);
+  const [balanceMonitoringEnabled, setBalanceMonitoringEnabled] = useState(true);
 
   useEffect(() => {
     loadTiers();
@@ -70,6 +79,9 @@ export default function SuperAdminConfig() {
       setSmsProvider(data.primary_sms_provider || 'brevo');
       setAlertEmail(data.alert_email || '');
       setAlertPhone(data.alert_phone || '');
+      setEmailThreshold(data.balance_thresholds?.email_credits || 1000);
+      setSmsThreshold(data.balance_thresholds?.sms_credits || 500);
+      setBalanceMonitoringEnabled(data.balance_monitoring_enabled ?? true);
     }
   };
 
@@ -81,6 +93,11 @@ export default function SuperAdminConfig() {
         primary_sms_provider: smsProvider,
         alert_email: alertEmail || null,
         alert_phone: alertPhone || null,
+        balance_thresholds: {
+          email_credits: emailThreshold,
+          sms_credits: smsThreshold,
+        },
+        balance_monitoring_enabled: balanceMonitoringEnabled,
       })
       .limit(1);
 
@@ -334,6 +351,152 @@ export default function SuperAdminConfig() {
                         </>
                       )}
                     </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 bg-yellow-500/10 rounded-lg">
+                    <TrendingDown className="w-5 h-5 text-yellow-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Balance Thresholds</h2>
+                    <p className="text-sm text-gray-400">Configure low balance alerts for Brevo credits</p>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <h3 className="text-white font-medium mb-1">Automated Balance Monitoring</h3>
+                        <p className="text-sm text-gray-400">
+                          When your Brevo email or SMS credits fall below the configured thresholds,
+                          the system will automatically send alerts to the configured email and phone number.
+                          This helps prevent service interruptions due to insufficient credits.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-black/50 border border-zinc-800 rounded-lg p-6">
+                      <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                        <Mail className="w-4 h-4" />
+                        Email Credit Threshold
+                      </h3>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                            Alert When Below (credits)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="100"
+                            value={emailThreshold}
+                            onChange={(e) => setEmailThreshold(parseInt(e.target.value) || 0)}
+                            className="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
+                          />
+                          <p className="text-xs text-gray-500 mt-1.5">
+                            Recommended: 1000 credits for high-volume accounts
+                          </p>
+                        </div>
+                        <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-3">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-400">Warning Alert:</span>
+                            <span className="text-yellow-400 font-medium">At threshold</span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm mt-2">
+                            <span className="text-gray-400">Critical Alert:</span>
+                            <span className="text-red-400 font-medium">At 50% of threshold</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-black/50 border border-zinc-800 rounded-lg p-6">
+                      <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4" />
+                        SMS Credit Threshold
+                      </h3>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                            Alert When Below (credits)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="50"
+                            value={smsThreshold}
+                            onChange={(e) => setSmsThreshold(parseInt(e.target.value) || 0)}
+                            className="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
+                          />
+                          <p className="text-xs text-gray-500 mt-1.5">
+                            Recommended: 500 credits for high-volume accounts
+                          </p>
+                        </div>
+                        <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-3">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-400">Warning Alert:</span>
+                            <span className="text-yellow-400 font-medium">At threshold</span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm mt-2">
+                            <span className="text-gray-400">Critical Alert:</span>
+                            <span className="text-red-400 font-medium">At 50% of threshold</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-black/50 border border-zinc-800 rounded-lg p-6">
+                    <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+                      <Bell className="w-4 h-4" />
+                      Monitoring Settings
+                    </h3>
+                    <div className="space-y-4">
+                      <label className="flex items-center gap-3 p-4 bg-zinc-900 border border-zinc-700 rounded-lg cursor-pointer hover:border-orange-500 transition">
+                        <input
+                          type="checkbox"
+                          checked={balanceMonitoringEnabled}
+                          onChange={(e) => setBalanceMonitoringEnabled(e.target.checked)}
+                          className="w-4 h-4 text-orange-500 focus:ring-orange-500 rounded"
+                        />
+                        <div className="flex-1">
+                          <div className="text-white font-medium">Enable Automatic Balance Monitoring</div>
+                          <div className="text-sm text-gray-400">
+                            Automatically check balance and send alerts when thresholds are reached
+                          </div>
+                        </div>
+                      </label>
+
+                      {platformSettings?.last_balance_check && (
+                        <div className="text-sm text-gray-400 flex items-center gap-2">
+                          <RefreshCw className="w-4 h-4" />
+                          Last checked: {new Date(platformSettings.last_balance_check).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-gray-400">
+                        <p className="text-yellow-400 font-medium mb-1">Alert Configuration:</p>
+                        <ul className="space-y-1 list-disc list-inside">
+                          <li>Alerts are sent to the email and phone configured in System Alerts above</li>
+                          <li>Email alerts are sent for both email and SMS credit warnings</li>
+                          <li>SMS alerts are only sent for SMS credit warnings to avoid consuming credits</li>
+                          <li>Alerts are throttled to once per 24 hours to prevent spam</li>
+                          <li>Balance is checked automatically every hour when monitoring is enabled</li>
+                        </ul>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

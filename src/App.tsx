@@ -21,6 +21,8 @@ import SuperAdminTenants from './pages/SuperAdminTenants';
 import SuperAdminConfig from './pages/SuperAdminConfig';
 import SuperAdminCredits from './pages/SuperAdminCredits';
 import SuperAdminTestCommunications from './pages/SuperAdminTestCommunications';
+import SuperAdminCommunicationLogs from './pages/SuperAdminCommunicationLogs';
+import SuperAdminBrevoBalance from './pages/SuperAdminBrevoBalance';
 import CustomerPortalLogin from './pages/CustomerPortalLogin';
 import CustomerDashboard from './pages/CustomerDashboard';
 import CompanyProfile from './pages/CompanyProfile';
@@ -170,6 +172,22 @@ function App() {
         element={
           <SuperAdminProtectedRoute>
             <SuperAdminTestCommunications />
+          </SuperAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/communication-logs"
+        element={
+          <SuperAdminProtectedRoute>
+            <SuperAdminCommunicationLogs />
+          </SuperAdminProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/brevo-balance"
+        element={
+          <SuperAdminProtectedRoute>
+            <SuperAdminBrevoBalance />
           </SuperAdminProtectedRoute>
         }
       />

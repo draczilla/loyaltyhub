@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Menu, DollarSign, Users, CreditCard, TrendingUp, AlertCircle } from 'lucide-react';
+import { Menu, DollarSign, Users, CreditCard, TrendingUp, AlertCircle, Mail, MessageSquare, ExternalLink } from 'lucide-react';
 import SuperAdminSidebar from '../components/SuperAdminSidebar';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 interface TenantStats {
@@ -23,6 +24,7 @@ interface Tenant {
 }
 
 export default function SuperAdminDashboard() {
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [stats, setStats] = useState<TenantStats>({
     totalTenants: 0,
@@ -32,10 +34,25 @@ export default function SuperAdminDashboard() {
   });
   const [recentTenants, setRecentTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [brevoBalance, setBrevoBalance] = useState<any>(null);
 
   useEffect(() => {
     loadDashboardData();
+    loadBrevoBalance();
   }, []);
+
+  const loadBrevoBalance = async () => {
+    const { data } = await supabase
+      .from('brevo_account_balance')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (data) {
+      setBrevoBalance(data);
+    }
+  };
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -226,6 +243,49 @@ export default function SuperAdminDashboard() {
                   </table>
                 </div>
               </div>
+
+              {brevoBalance && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-orange-500/10 rounded-lg">
+                        <Mail className="w-5 h-5 text-orange-400" />
+                      </div>
+                      <h3 className="text-lg font-bold text-white">Brevo Balance</h3>
+                    </div>
+                    <button
+                      onClick={() => navigate('/admin/brevo-balance')}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white rounded-lg transition text-sm"
+                    >
+                      View Details
+                      <ExternalLink className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Mail className="w-4 h-4 text-blue-400" />
+                        <span className="text-sm text-gray-400">Email Credits</span>
+                      </div>
+                      <div className="text-2xl font-bold text-white">
+                        {brevoBalance.email_credits.toLocaleString()}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <MessageSquare className="w-4 h-4 text-orange-400" />
+                        <span className="text-sm text-gray-400">SMS Credits</span>
+                      </div>
+                      <div className="text-2xl font-bold text-white">
+                        {brevoBalance.sms_credits.toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-zinc-800 text-xs text-gray-500">
+                    Last updated: {new Date(brevoBalance.last_sync_at).toLocaleString()}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">

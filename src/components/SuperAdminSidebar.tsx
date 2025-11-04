@@ -8,7 +8,9 @@ import {
   X,
   CreditCard,
   Shield,
-  Mail
+  Mail,
+  MessageCircle,
+  Wallet
 } from 'lucide-react';
 
 interface SuperAdminSidebarProps {
@@ -31,6 +33,8 @@ export default function SuperAdminSidebar({ open, onClose }: SuperAdminSidebarPr
     { icon: Users, label: 'Tenants', path: '/admin/tenants' },
     { icon: Settings, label: 'Platform Config', path: '/admin/config' },
     { icon: CreditCard, label: 'Credit Logs', path: '/admin/credits' },
+    { icon: MessageCircle, label: 'Communication Logs', path: '/admin/communication-logs' },
+    { icon: Wallet, label: 'Brevo Balance', path: '/admin/brevo-balance' },
     { icon: Mail, label: 'Test Communications', path: '/admin/test-communications' },
   ];
 
