@@ -14,7 +14,8 @@ import {
   MessageSquare,
   Settings as SettingsIcon,
   History,
-  Building2
+  Building2,
+  ShieldAlert
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -25,7 +26,7 @@ interface SidebarProps {
 export default function Sidebar({ open, onClose }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signOut } = useAuth();
+  const { signOut, isSuperAdmin } = useAuth();
 
   const handleSignOut = async () => {
     await signOut();
@@ -102,6 +103,21 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                   </li>
                 );
               })}
+
+              {isSuperAdmin && (
+                <li>
+                  <button
+                    onClick={() => {
+                      navigate('/admin/dashboard');
+                      onClose();
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 mt-2"
+                  >
+                    <ShieldAlert className="w-5 h-5" />
+                    <span className="font-medium">Super Admin Console</span>
+                  </button>
+                </li>
+              )}
             </ul>
           </nav>
 
