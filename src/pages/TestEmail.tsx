@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import Sidebar from '../components/Sidebar';
-import { Mail, Send } from 'lucide-react';
+import { Mail, Send, Menu } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export default function TestEmail() {
   const { business } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -76,12 +77,20 @@ export default function TestEmail() {
 
   return (
     <div className="flex min-h-screen bg-black">
-      <Sidebar />
-      <div className="flex-1 ml-64">
-        <div className="p-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">Test Email Integration</h1>
-            <p className="text-gray-400">Send a test email to verify your Brevo integration</p>
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="flex-1 lg:ml-64">
+        <div className="p-4 lg:p-8">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2">Test Email Integration</h1>
+              <p className="text-gray-400">Send a test email to verify your Brevo integration</p>
+            </div>
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden p-2 text-gray-400 hover:text-white transition"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
           </div>
 
           <div className="bg-gray-900 rounded-lg border border-gray-800 p-6 max-w-2xl">
