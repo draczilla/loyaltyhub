@@ -24,6 +24,7 @@ import CustomerPortalLogin from './pages/CustomerPortalLogin';
 import CustomerDashboard from './pages/CustomerDashboard';
 import CompanyProfile from './pages/CompanyProfile';
 import AcceptInvitation from './pages/AcceptInvitation';
+import TestEmail from './pages/TestEmail';
 
 function App() {
   const { user, loading, isSuperAdmin } = useAuth();
@@ -129,6 +130,14 @@ function App() {
         element={
           <ProtectedRoute>
             <Communications />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/test-email"
+        element={
+          <ProtectedRoute>
+            <TestEmail />
           </ProtectedRoute>
         }
       />
