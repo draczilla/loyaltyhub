@@ -186,6 +186,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const createBusinessForOAuthUser = async (userId: string) => {
     try {
+      // First check if this user is a super admin
+      const { data: superAdminCheck } = await supabase
+        .from('super_admins')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (superAdminCheck) {
+        console.log('User is a super admin - not creating business record');
+        setBusiness(null);
+        setTenant(null);
+        setIsSuperAdmin(true);
+        setIsTenantAdmin(false);
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user || !user.email) {
