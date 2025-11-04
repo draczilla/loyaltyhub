@@ -1,0 +1,308 @@
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
+import { Users, Gift, QrCode, TrendingUp, Menu, CheckCircle, XCircle, AlertCircle, Mail, Eye } from 'lucide-react';
+import Sidebar from '../components/Sidebar';
+import AddCustomerModal from '../components/AddCustomerModal';
+
+interface DashboardStats {
+  totalCustomers: number;
+  activePrograms: number;
+  totalTransactions: number;
+  newCustomersThisMonth: number;
+  emailsSent: number;
+  emailOpenRate: number;
+}
+
+export default function Dashboard() {
+  const { business } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [stats, setStats] = useState<DashboardStats>({
+    totalCustomers: 0,
+    activePrograms: 0,
+    totalTransactions: 0,
+    newCustomersThisMonth: 0,
+    emailsSent: 0,
+    emailOpenRate: 0,
+  });
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
+  const [paymentNotification, setPaymentNotification] = useState<'success' | 'cancelled' | null>(null);
+
+  useEffect(() => {
+    if (business) {
+      loadDashboardStats();
+    }
+
+    const payment = searchParams.get('payment');
+    if (payment === 'success') {
+      setPaymentNotification('success');
+      setSearchParams({});
+      setTimeout(() => setPaymentNotification(null), 10000);
+    } else if (payment === 'cancelled') {
+      setPaymentNotification('cancelled');
+      setSearchParams({});
+      setTimeout(() => setPaymentNotification(null), 10000);
+    }
+  }, [business, searchParams, setSearchParams]);
+
+  const loadDashboardStats = async () => {
+    if (!business) return;
+
+    const [customersResult, programsResult, transactionsResult, emailsResult] = await Promise.all([
+      supabase
+        .from('customers')
+        .select('id, created_at', { count: 'exact' })
+        .eq('business_id', business.id),
+      supabase
+        .from('loyalty_programs')
+        .select('id', { count: 'exact' })
+        .eq('business_id', business.id)
+        .eq('status', 'active'),
+      supabase
+        .from('transactions')
+        .select('id', { count: 'exact' })
+        .eq('business_id', business.id),
+      supabase
+        .from('communication_logs')
+        .select('id, opened_at', { count: 'exact' })
+        .eq('business_id', business.id)
+        .eq('type', 'email')
+        .eq('status', 'sent'),
+    ]);
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const newCustomersThisMonth = customersResult.data?.filter(
+      c => new Date(c.created_at) >= startOfMonth
+    ).length || 0;
+
+    const totalEmails = emailsResult.count || 0;
+    const openedEmails = emailsResult.data?.filter(e => e.opened_at !== null).length || 0;
+    const emailOpenRate = totalEmails > 0 ? Math.round((openedEmails / totalEmails) * 100) : 0;
+
+    setStats({
+      totalCustomers: customersResult.count || 0,
+      activePrograms: programsResult.count || 0,
+      totalTransactions: transactionsResult.count || 0,
+      newCustomersThisMonth,
+      emailsSent: totalEmails,
+      emailOpenRate,
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-black flex">
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      <div className="flex-1 flex flex-col min-h-screen lg:ml-64">
+        <header className="bg-zinc-900 border-b border-zinc-800 sticky top-0 z-10">
+          <div className="px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="lg:hidden text-gray-400 hover:text-white transition"
+                >
+                  <Menu className="w-6 h-6" />
+                </button>
+                <div>
+                  <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+                  <p className="text-gray-400 text-sm mt-1">Welcome back, {business?.company_name}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="px-3 py-1 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+                  <span className="text-orange-400 text-sm font-medium">
+                    {business?.subscription_status === 'trial' ? 'Trial' : business?.subscription_status}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-8">
+          {paymentNotification === 'success' && (
+            <div className="mb-6 bg-green-500/10 border border-green-500/20 rounded-lg p-4 flex items-start gap-3">
+              <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-green-400 font-medium mb-1">Payment Successful!</h3>
+                <p className="text-gray-300 text-sm">
+                  Your subscription has been activated. Thank you for upgrading!
+                </p>
+              </div>
+              <button
+                onClick={() => setPaymentNotification(null)}
+                className="ml-auto text-gray-400 hover:text-white transition"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+
+          {paymentNotification === 'cancelled' && (
+            <div className="mb-6 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-yellow-400 font-medium mb-1">Payment Cancelled</h3>
+                <p className="text-gray-300 text-sm">
+                  Your payment was cancelled. You can upgrade anytime from the Subscription page.
+                </p>
+              </div>
+              <button
+                onClick={() => setPaymentNotification(null)}
+                className="ml-auto text-gray-400 hover:text-white transition"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+
+          {business?.subscription_status === 'trial' && (
+            <div className="mb-6 bg-orange-500/10 border border-orange-500/20 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-orange-400 font-medium mb-1">Trial Period Active</h3>
+                <p className="text-gray-300 text-sm">
+                  You're currently on a trial. Upgrade to continue enjoying premium features without interruption.
+                </p>
+              </div>
+              <button
+                onClick={() => navigate('/subscription')}
+                className="ml-auto px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm transition"
+              >
+                View Plans
+              </button>
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-orange-500/10 rounded-lg flex items-center justify-center">
+                  <Users className="w-6 h-6 text-orange-400" />
+                </div>
+              </div>
+              <h3 className="text-gray-400 text-sm mb-1">Total Customers</h3>
+              <p className="text-3xl font-bold text-white">{stats.totalCustomers}</p>
+              <p className="text-sm text-gray-500 mt-2">
+                +{stats.newCustomersThisMonth} this month
+              </p>
+            </div>
+
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-orange-500/10 rounded-lg flex items-center justify-center">
+                  <Gift className="w-6 h-6 text-orange-400" />
+                </div>
+              </div>
+              <h3 className="text-gray-400 text-sm mb-1">Active Programs</h3>
+              <p className="text-3xl font-bold text-white">{stats.activePrograms}</p>
+              <p className="text-sm text-gray-500 mt-2">Loyalty programs</p>
+            </div>
+
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-orange-500/10 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-orange-400" />
+                </div>
+              </div>
+              <h3 className="text-gray-400 text-sm mb-1">Transactions</h3>
+              <p className="text-3xl font-bold text-white">{stats.totalTransactions}</p>
+              <p className="text-sm text-gray-500 mt-2">All time</p>
+            </div>
+
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-orange-500/10 rounded-lg flex items-center justify-center">
+                  <QrCode className="w-6 h-6 text-orange-400" />
+                </div>
+              </div>
+              <h3 className="text-gray-400 text-sm mb-1">SMS Usage</h3>
+              <p className="text-3xl font-bold text-white">{business?.usage_sms_monthly || 0}</p>
+              <p className="text-sm text-gray-500 mt-2">This month</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center">
+                      <Mail className="w-5 h-5 text-blue-400" />
+                    </div>
+                    <h3 className="text-white font-semibold">Emails Sent</h3>
+                  </div>
+                  <p className="text-4xl font-bold text-white">{stats.emailsSent}</p>
+                  <p className="text-sm text-gray-400 mt-2">Total emails delivered</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center">
+                      <Eye className="w-5 h-5 text-blue-400" />
+                    </div>
+                    <h3 className="text-white font-semibold">Email Open Rate</h3>
+                  </div>
+                  <p className="text-4xl font-bold text-white">{stats.emailOpenRate}%</p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    {stats.emailsSent > 0 ? 'Based on tracking pixels' : 'Send emails to see stats'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <h2 className="text-xl font-bold text-white mb-4">Quick Actions</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <button
+                onClick={() => setShowAddCustomerModal(true)}
+                className="p-4 bg-black border border-zinc-700 hover:border-orange-500/50 rounded-lg text-left transition group"
+              >
+                <Users className="w-8 h-8 text-orange-400 mb-3 group-hover:scale-110 transition" />
+                <h3 className="text-white font-medium mb-1">Add Customer</h3>
+                <p className="text-sm text-gray-400">Manually add a new customer</p>
+              </button>
+
+              <button
+                onClick={() => navigate('/qr-codes')}
+                className="p-4 bg-black border border-zinc-700 hover:border-orange-500/50 rounded-lg text-left transition group"
+              >
+                <QrCode className="w-8 h-8 text-orange-400 mb-3 group-hover:scale-110 transition" />
+                <h3 className="text-white font-medium mb-1">Generate QR Code</h3>
+                <p className="text-sm text-gray-400">Create sign-up QR code</p>
+              </button>
+
+              <button
+                onClick={() => navigate('/programs')}
+                className="p-4 bg-black border border-zinc-700 hover:border-orange-500/50 rounded-lg text-left transition group"
+              >
+                <Gift className="w-8 h-8 text-orange-400 mb-3 group-hover:scale-110 transition" />
+                <h3 className="text-white font-medium mb-1">Create Program</h3>
+                <p className="text-sm text-gray-400">Set up a loyalty program</p>
+              </button>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      {showAddCustomerModal && (
+        <AddCustomerModal
+          onClose={() => setShowAddCustomerModal(false)}
+          onSuccess={() => {
+            setShowAddCustomerModal(false);
+            loadDashboardStats();
+          }}
+        />
+      )}
+    </div>
+  );
+}

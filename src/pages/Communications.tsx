@@ -1,0 +1,366 @@
+import { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
+import Sidebar from '../components/Sidebar';
+import { Menu, Mail, MessageSquare, Search, CheckCircle, XCircle, Clock, Eye, User } from 'lucide-react';
+
+interface CommunicationLog {
+  id: string;
+  customer_id: string;
+  type: 'email' | 'sms';
+  template_name: string | null;
+  subject: string | null;
+  content: string;
+  status: 'sent' | 'failed' | 'pending';
+  opened_at: string | null;
+  open_count: number;
+  provider: string | null;
+  created_at: string;
+  customer: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+    phone: string | null;
+  };
+}
+
+export default function Communications() {
+  const { business } = useAuth();
+  const [logs, setLogs] = useState<CommunicationLog[]>([]);
+  const [filteredLogs, setFilteredLogs] = useState<CommunicationLog[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'email' | 'sms'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'sent' | 'failed' | 'opened'>('all');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [selectedLog, setSelectedLog] = useState<CommunicationLog | null>(null);
+
+  useEffect(() => {
+    if (business) {
+      loadCommunicationLogs();
+    }
+  }, [business]);
+
+  useEffect(() => {
+    let filtered = logs;
+
+    if (filterType !== 'all') {
+      filtered = filtered.filter(log => log.type === filterType);
+    }
+
+    if (filterStatus !== 'all') {
+      if (filterStatus === 'opened') {
+        filtered = filtered.filter(log => log.opened_at !== null);
+      } else {
+        filtered = filtered.filter(log => log.status === filterStatus);
+      }
+    }
+
+    if (searchQuery) {
+      filtered = filtered.filter(log => {
+        const customerName = [log.customer.first_name, log.customer.last_name]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        const searchLower = searchQuery.toLowerCase();
+
+        return (
+          customerName.includes(searchLower) ||
+          log.customer.email?.toLowerCase().includes(searchLower) ||
+          log.customer.phone?.includes(searchQuery) ||
+          log.subject?.toLowerCase().includes(searchLower) ||
+          log.template_name?.toLowerCase().includes(searchLower)
+        );
+      });
+    }
+
+    setFilteredLogs(filtered);
+  }, [searchQuery, filterType, filterStatus, logs]);
+
+  const loadCommunicationLogs = async () => {
+    if (!business) return;
+
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('communication_logs')
+      .select(`
+        *,
+        customer:customers(first_name, last_name, email, phone)
+      `)
+      .eq('business_id', business.id)
+      .order('created_at', { ascending: false })
+      .limit(500);
+
+    if (!error && data) {
+      setLogs(data as any);
+      setFilteredLogs(data as any);
+    }
+    setLoading(false);
+  };
+
+  const getStatusIcon = (status: string, openedAt: string | null) => {
+    if (openedAt) {
+      return <Eye className="w-4 h-4 text-blue-400" />;
+    }
+    switch (status) {
+      case 'sent':
+        return <CheckCircle className="w-4 h-4 text-green-400" />;
+      case 'failed':
+        return <XCircle className="w-4 h-4 text-red-400" />;
+      case 'pending':
+        return <Clock className="w-4 h-4 text-yellow-400" />;
+      default:
+        return null;
+    }
+  };
+
+  const getStatusLabel = (log: CommunicationLog) => {
+    if (log.opened_at) {
+      return `Opened ${log.open_count} time${log.open_count !== 1 ? 's' : ''}`;
+    }
+    return log.status.charAt(0).toUpperCase() + log.status.slice(1);
+  };
+
+  const getStatusColor = (status: string, openedAt: string | null) => {
+    if (openedAt) {
+      return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+    }
+    switch (status) {
+      case 'sent':
+        return 'bg-green-500/10 text-green-400 border-green-500/20';
+      case 'failed':
+        return 'bg-red-500/10 text-red-400 border-red-500/20';
+      case 'pending':
+        return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
+      default:
+        return 'bg-gray-500/10 text-gray-400 border-gray-500/20';
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(date);
+  };
+
+  return (
+    <div className="min-h-screen bg-black flex">
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+
+      <div className="flex-1 flex flex-col min-h-screen lg:ml-64">
+        <header className="bg-zinc-900 border-b border-zinc-800 sticky top-0 z-10">
+          <div className="px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="lg:hidden text-gray-400 hover:text-white transition"
+                >
+                  <Menu className="w-6 h-6" />
+                </button>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center">
+                    <Mail className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold text-white">Communication History</h1>
+                    <p className="text-gray-400 text-sm mt-1">View all sent emails and SMS messages</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-col sm:flex-row gap-3">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                <input
+                  type="text"
+                  placeholder="Search by customer, subject, or template..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-black border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value as any)}
+                  className="px-4 py-2 bg-black border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
+                >
+                  <option value="all">All Types</option>
+                  <option value="email">Email</option>
+                  <option value="sms">SMS</option>
+                </select>
+
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value as any)}
+                  className="px-4 py-2 bg-black border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
+                >
+                  <option value="all">All Status</option>
+                  <option value="sent">Sent</option>
+                  <option value="opened">Opened</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-8">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : filteredLogs.length === 0 ? (
+            <div className="text-center py-12">
+              <Mail className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+              <h3 className="text-xl font-medium text-gray-400 mb-2">No communication logs</h3>
+              <p className="text-gray-500">
+                {logs.length === 0
+                  ? 'Send your first email or SMS to see communication history'
+                  : 'No logs match your current filters'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredLogs.map((log) => (
+                <div
+                  key={log.id}
+                  className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-700 transition cursor-pointer"
+                  onClick={() => setSelectedLog(log)}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                        log.type === 'email' ? 'bg-blue-500/10' : 'bg-green-500/10'
+                      }`}>
+                        {log.type === 'email' ? (
+                          <Mail className={`w-5 h-5 ${log.type === 'email' ? 'text-blue-400' : 'text-green-400'}`} />
+                        ) : (
+                          <MessageSquare className="w-5 h-5 text-green-400" />
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-white font-medium truncate">
+                            {log.template_name || (log.type === 'email' ? 'Email Message' : 'SMS Message')}
+                          </h3>
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(log.status, log.opened_at)}`}>
+                            {getStatusLabel(log)}
+                          </span>
+                        </div>
+
+                        {log.subject && (
+                          <p className="text-sm text-gray-400 mb-1 truncate">{log.subject}</p>
+                        )}
+
+                        <div className="flex items-center gap-3 text-xs text-gray-500">
+                          <span className="flex items-center gap-1">
+                            <User className="w-3 h-3" />
+                            {[log.customer.first_name, log.customer.last_name].filter(Boolean).join(' ') ||
+                              log.customer.email ||
+                              log.customer.phone ||
+                              'Unknown'}
+                          </span>
+                          <span>{formatDate(log.created_at)}</span>
+                          {log.provider && (
+                            <span className="text-xs bg-zinc-800 px-2 py-0.5 rounded">
+                              {log.provider}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(log.status, log.opened_at)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </main>
+      </div>
+
+      {selectedLog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedLog(null)}>
+          <div className="bg-zinc-900 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden border border-zinc-800" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-zinc-800">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-white">
+                  {selectedLog.type === 'email' ? 'Email' : 'SMS'} Details
+                </h2>
+                <button
+                  onClick={() => setSelectedLog(null)}
+                  className="text-gray-400 hover:text-white transition"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-3 text-sm">
+                <div>
+                  <span className="text-gray-400">Customer:</span>
+                  <span className="text-white ml-2">
+                    {[selectedLog.customer.first_name, selectedLog.customer.last_name].filter(Boolean).join(' ') ||
+                      selectedLog.customer.email ||
+                      selectedLog.customer.phone}
+                  </span>
+                </div>
+
+                {selectedLog.template_name && (
+                  <div>
+                    <span className="text-gray-400">Template:</span>
+                    <span className="text-white ml-2">{selectedLog.template_name}</span>
+                  </div>
+                )}
+
+                {selectedLog.subject && (
+                  <div>
+                    <span className="text-gray-400">Subject:</span>
+                    <span className="text-white ml-2">{selectedLog.subject}</span>
+                  </div>
+                )}
+
+                <div>
+                  <span className="text-gray-400">Status:</span>
+                  <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(selectedLog.status, selectedLog.opened_at)}`}>
+                    {getStatusLabel(selectedLog)}
+                  </span>
+                </div>
+
+                {selectedLog.opened_at && (
+                  <div>
+                    <span className="text-gray-400">First Opened:</span>
+                    <span className="text-white ml-2">{formatDate(selectedLog.opened_at)}</span>
+                  </div>
+                )}
+
+                <div>
+                  <span className="text-gray-400">Sent:</span>
+                  <span className="text-white ml-2">{formatDate(selectedLog.created_at)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-96">
+              <h3 className="text-sm font-medium text-gray-400 mb-2">Message Content:</h3>
+              <div className="bg-black border border-zinc-700 rounded-lg p-4">
+                <p className="text-white whitespace-pre-wrap">{selectedLog.content}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
