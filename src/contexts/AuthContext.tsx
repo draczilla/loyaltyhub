@@ -65,35 +65,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const initAuth = async () => {
       try {
-        // Check for cached auth state first
-        const cachedAuthState = sessionStorage.getItem('auth_state');
-        const cachedTimestamp = sessionStorage.getItem('auth_timestamp');
-
-        // Use cache if less than 30 seconds old
-        if (cachedAuthState && cachedTimestamp) {
-          const age = Date.now() - parseInt(cachedTimestamp);
-          if (age < 30000) {
-            try {
-              const cached = JSON.parse(cachedAuthState);
-              if (cached.user && mounted) {
-                setUser(cached.user);
-                setBusiness(cached.business);
-                setTenant(cached.tenant);
-                setIsSuperAdmin(cached.isSuperAdmin);
-                setIsTenantAdmin(cached.isTenantAdmin);
-                setLoading(false);
-                // Refresh in background
-                loadAuthDataInBackground(cached.user.id);
-                return;
-              }
-            } catch (e) {
-              console.warn('Invalid cached auth state');
-              sessionStorage.removeItem('auth_state');
-              sessionStorage.removeItem('auth_timestamp');
-            }
-          }
-        }
-
         const { data: { session } } = await supabase.auth.getSession();
 
         if (!mounted) return;
@@ -102,8 +73,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
+          // Check cache first, but only if we have a valid session
+          const cachedAuthState = sessionStorage.getItem('auth_state');
+          const cachedTimestamp = sessionStorage.getItem('auth_timestamp');
+
+          if (cachedAuthState && cachedTimestamp) {
+            const age = Date.now() - parseInt(cachedTimestamp);
+            if (age < 30000) {
+              try {
+                const cached = JSON.parse(cachedAuthState);
+                if (cached.user && cached.user.id === session.user.id) {
+                  // Use cached data for instant UI
+                  setBusiness(cached.business);
+                  setTenant(cached.tenant);
+                  setIsSuperAdmin(cached.isSuperAdmin);
+                  setIsTenantAdmin(cached.isTenantAdmin);
+                  setLoading(false);
+                  // Refresh in background
+                  loadAuthDataInBackground(session.user.id);
+                  return;
+                }
+              } catch (e) {
+                console.warn('Invalid cached auth state');
+                sessionStorage.removeItem('auth_state');
+                sessionStorage.removeItem('auth_timestamp');
+              }
+            }
+          }
+          // No valid cache, load fresh data
           await loadBusiness(session.user.id);
         } else {
+          // Clear any stale cache
+          sessionStorage.removeItem('auth_state');
+          sessionStorage.removeItem('auth_timestamp');
           setLoading(false);
         }
       } catch (error) {
@@ -178,6 +180,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadBusiness = async (userId: string) => {
     try {
+      console.log('Loading business data for user:', userId);
+
       // Use the combined RPC function for better performance
       const { data, error } = await supabase.rpc('get_user_auth_data', { user_id_param: userId });
 
@@ -194,10 +198,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      console.log('Auth data loaded:', data);
       updateAuthState(data, userId);
 
       // If no user record found, create one for OAuth users
       if (data.user_type === 'none') {
+        console.log('No user record found, creating business for OAuth user');
         await createBusinessForOAuthUser(userId);
       }
     } catch (error) {
@@ -207,6 +213,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsSuperAdmin(false);
       setIsTenantAdmin(false);
     } finally {
+      console.log('Finished loading business, setting loading to false');
       setLoading(false);
     }
   };
