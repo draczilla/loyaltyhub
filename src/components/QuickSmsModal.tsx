@@ -104,10 +104,14 @@ export default function QuickSmsModal({
 
       if (logError) throw logError;
 
-      const { error: usageError } = await supabase
-        .from('businesses')
-        .update({ usage_sms_monthly: supabase.raw('usage_sms_monthly + 1') })
-        .eq('id', businessId);
+      const { error: usageError } = await supabase.rpc('increment_business_usage', {
+        p_business_id: businessId,
+        p_column_name: 'usage_sms_monthly',
+      });
+
+      if (usageError) {
+        console.error('Failed to increment SMS usage:', usageError);
+      }
 
       setSuccess(true);
       setTimeout(() => {
