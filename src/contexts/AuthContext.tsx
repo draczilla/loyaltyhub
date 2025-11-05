@@ -291,6 +291,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           usage_sms_monthly: 0,
           tenant_id: tenantToUse.id,
           is_tenant_admin: true,
+          email_verified: true,
+          phone_verified: true,
+          onboarding_status: 'completed',
         })
         .select()
         .single();
@@ -387,6 +390,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           usage_sms_monthly: 0,
           tenant_id: tenantToUse.id,
           is_tenant_admin: true,
+          email_verified: true,
+          phone_verified: true,
+          onboarding_status: 'completed',
         });
 
       if (businessError) {
@@ -406,39 +412,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (memberError) {
         console.error('Error creating tenant member:', memberError);
-      }
-
-      // Get tier name for welcome email
-      const { data: tierData } = await supabase
-        .from('subscription_tiers')
-        .select('name')
-        .eq('id', tierId)
-        .maybeSingle();
-
-      // Send welcome verification email
-      try {
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-welcome-verification`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              businessId: authData.user.id,
-              email,
-              companyName,
-              tierName: tierData?.name || 'Free',
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          console.error('Failed to send welcome verification email');
-        }
-      } catch (error) {
-        console.error('Error sending welcome verification email:', error);
       }
     }
 

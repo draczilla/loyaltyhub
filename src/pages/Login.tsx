@@ -24,17 +24,11 @@ export default function Login() {
     if (!authLoading && user) {
       if (isSuperAdmin) {
         navigate('/admin/dashboard');
-      } else if (business) {
-        if (!business.email_verified) {
-          navigate('/pending-verification');
-        } else if (!business.phone_verified) {
-          navigate('/verify-phone-setup');
-        } else {
-          navigate('/dashboard');
-        }
+      } else {
+        navigate('/dashboard');
       }
     }
-  }, [isSuperAdmin, authLoading, user, business, navigate]);
+  }, [isSuperAdmin, authLoading, user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

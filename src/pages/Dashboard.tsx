@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Users, Gift, QrCode, TrendingUp, Menu, CheckCircle, XCircle, AlertCircle, Mail, Eye } from 'lucide-react';
+import { Users, Gift, QrCode, TrendingUp, Menu, CheckCircle, XCircle, AlertCircle, Mail, Eye, Info } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import AddCustomerModal from '../components/AddCustomerModal';
 
@@ -30,6 +30,7 @@ export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
   const [paymentNotification, setPaymentNotification] = useState<'success' | 'cancelled' | null>(null);
+  const [showVerificationBanner, setShowVerificationBanner] = useState(true);
 
   useEffect(() => {
     if (business) {
@@ -155,6 +156,44 @@ export default function Dashboard() {
               <button
                 onClick={() => setPaymentNotification(null)}
                 className="ml-auto text-gray-400 hover:text-white transition"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+
+          {showVerificationBanner && business && (!business.email_verified || !business.phone_verified) && (
+            <div className="mb-6 bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 flex items-start gap-3">
+              <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-blue-400 font-medium mb-1">Complete Your Account Setup</h3>
+                <p className="text-gray-300 text-sm mb-3">
+                  {!business.email_verified && !business.phone_verified && 'Verify your email and phone to unlock all features.'}
+                  {business.email_verified && !business.phone_verified && 'Verify your phone number to unlock all features.'}
+                  {!business.email_verified && business.phone_verified && 'Verify your email address to unlock all features.'}
+                </p>
+                <div className="flex gap-2">
+                  {!business.email_verified && (
+                    <button
+                      onClick={() => navigate('/pending-verification')}
+                      className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm transition"
+                    >
+                      Verify Email
+                    </button>
+                  )}
+                  {!business.phone_verified && (
+                    <button
+                      onClick={() => navigate('/verify-phone-setup')}
+                      className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm transition"
+                    >
+                      Verify Phone
+                    </button>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setShowVerificationBanner(false)}
+                className="text-gray-400 hover:text-white transition"
               >
                 <XCircle className="w-5 h-5" />
               </button>
