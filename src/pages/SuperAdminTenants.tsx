@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Menu, Search, ExternalLink, CreditCard, Calendar, Mail, Building, Download, Trash2, AlertTriangle } from 'lucide-react';
+import { Menu, Search, ExternalLink, CreditCard, Calendar, Mail, Building, Download, Trash2, AlertTriangle, Phone, Plus } from 'lucide-react';
 import SuperAdminSidebar from '../components/SuperAdminSidebar';
 import { supabase } from '../lib/supabase';
 
@@ -7,6 +7,7 @@ interface Tenant {
   id: string;
   email: string;
   company_name: string;
+  phone: string | null;
   subscription_status: string;
   credits_remaining: number;
   stripe_price_id: string | null;
@@ -27,6 +28,7 @@ export default function SuperAdminTenants() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     loadTenants();
@@ -44,6 +46,7 @@ export default function SuperAdminTenants() {
         id,
         email,
         company_name,
+        phone,
         subscription_status,
         credits_remaining,
         stripe_price_id,
@@ -67,6 +70,7 @@ export default function SuperAdminTenants() {
         id: t.id,
         email: t.email,
         company_name: t.company_name,
+        phone: t.phone,
         subscription_status: t.subscription_status,
         credits_remaining: t.credits_remaining,
         stripe_price_id: t.stripe_price_id,
@@ -93,7 +97,8 @@ export default function SuperAdminTenants() {
       filtered = filtered.filter(
         (t) =>
           t.company_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          t.email.toLowerCase().includes(searchQuery.toLowerCase())
+          t.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (t.phone && t.phone.toLowerCase().includes(searchQuery.toLowerCase()))
       );
     }
 
@@ -148,11 +153,18 @@ export default function SuperAdminTenants() {
 
         <main className="flex-1 px-4 sm:px-6 lg:px-8 py-8">
           <div className="mb-6 flex flex-col sm:flex-row gap-4">
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-4 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg transition flex items-center justify-center gap-2"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Create Company</span>
+            </button>
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search by company name or email..."
+                placeholder="Search by company name, email, or phone..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
@@ -184,7 +196,7 @@ export default function SuperAdminTenants() {
                         Company
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                        Email
+                        Contact
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                         Tier
@@ -213,7 +225,16 @@ export default function SuperAdminTenants() {
                           <div className="text-sm font-medium text-white">{tenant.company_name}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-400">{tenant.email}</div>
+                          <div className="text-sm text-gray-400 flex items-center gap-1">
+                            <Mail className="w-3 h-3" />
+                            {tenant.email}
+                          </div>
+                          {tenant.phone && (
+                            <div className="text-sm text-gray-400 flex items-center gap-1 mt-1">
+                              <Phone className="w-3 h-3" />
+                              {tenant.phone}
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-white">{tenant.tier_name}</div>
@@ -268,13 +289,21 @@ export default function SuperAdminTenants() {
           tenant={selectedTenant}
           onClose={() => setSelectedTenant(null)}
           onDeleted={loadTenants}
+          onUpdated={loadTenants}
+        />
+      )}
+
+      {showCreateModal && (
+        <CreateCompanyModal
+          onClose={() => setShowCreateModal(false)}
+          onCreated={loadTenants}
         />
       )}
     </div>
   );
 }
 
-function TenantDetailsModal({ tenant, onClose, onDeleted }: { tenant: Tenant; onClose: () => void; onDeleted: () => void }) {
+function TenantDetailsModal({ tenant, onClose, onDeleted, onUpdated }: { tenant: Tenant; onClose: () => void; onDeleted: () => void; onUpdated: () => void }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDataExport, setShowDataExport] = useState(false);
   const [exportingData, setExportingData] = useState(false);
@@ -283,6 +312,74 @@ function TenantDetailsModal({ tenant, onClose, onDeleted }: { tenant: Tenant; on
   const [confirmDataExported, setConfirmDataExported] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [exportSummary, setExportSummary] = useState<any>(null);
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [phoneValue, setPhoneValue] = useState(tenant.phone || '');
+  const [savingPhone, setSavingPhone] = useState(false);
+  const [syncingToBrevo, setSyncingToBrevo] = useState(false);
+
+  const handleUpdatePhone = async () => {
+    setSavingPhone(true);
+    try {
+      const { error } = await supabase
+        .from('businesses')
+        .update({ phone: phoneValue || null })
+        .eq('id', tenant.id);
+
+      if (error) throw error;
+
+      alert('Phone number updated successfully');
+      setEditingPhone(false);
+      onUpdated();
+    } catch (error) {
+      console.error('Error updating phone:', error);
+      alert(`Failed to update phone number: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setSavingPhone(false);
+    }
+  };
+
+  const handleSyncToBrevo = async () => {
+    if (!tenant.phone) {
+      alert('Please add a phone number before syncing to Brevo');
+      return;
+    }
+
+    setSyncingToBrevo(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('Not authenticated');
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-business-to-brevo`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            businessId: tenant.id,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to sync to Brevo');
+      }
+
+      alert('Business contact successfully synced to Brevo contact list');
+    } catch (error) {
+      console.error('Brevo sync error:', error);
+      alert(`Failed to sync to Brevo: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setSyncingToBrevo(false);
+    }
+  };
 
   const handleExportData = async () => {
     setExportingData(true);
@@ -606,6 +703,64 @@ function TenantDetailsModal({ tenant, onClose, onDeleted }: { tenant: Tenant; on
               </div>
 
               <div>
+                <div className="flex items-center justify-between text-sm text-gray-400 mb-2">
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-4 h-4" />
+                    <span>Mobile Number</span>
+                  </div>
+                  {!editingPhone && (
+                    <button
+                      onClick={() => setEditingPhone(true)}
+                      className="text-orange-400 hover:text-orange-300 text-xs"
+                    >
+                      Edit
+                    </button>
+                  )}
+                </div>
+                {editingPhone ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="tel"
+                      value={phoneValue}
+                      onChange={(e) => setPhoneValue(e.target.value)}
+                      placeholder="+1234567890"
+                      className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 text-sm"
+                    />
+                    <button
+                      onClick={handleUpdatePhone}
+                      disabled={savingPhone}
+                      className="px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition disabled:opacity-50 text-sm"
+                    >
+                      {savingPhone ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingPhone(false);
+                        setPhoneValue(tenant.phone || '');
+                      }}
+                      disabled={savingPhone}
+                      className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition disabled:opacity-50 text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-white">{tenant.phone || 'Not set'}</p>
+                    {tenant.phone && (
+                      <button
+                        onClick={handleSyncToBrevo}
+                        disabled={syncingToBrevo}
+                        className="mt-2 text-xs text-blue-400 hover:text-blue-300 transition disabled:opacity-50"
+                      >
+                        {syncingToBrevo ? 'Syncing...' : 'Sync to Brevo Contact List'}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div>
                 <div className="flex items-center gap-2 text-sm text-gray-400 mb-2">
                   <CreditCard className="w-4 h-4" />
                   <span>Subscription Tier</span>
@@ -703,6 +858,259 @@ function TenantDetailsModal({ tenant, onClose, onDeleted }: { tenant: Tenant; on
               Export data before deletion to comply with GDPR requirements
             </p>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CreateCompanyModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [companyName, setCompanyName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [tierId, setTierId] = useState('');
+  const [tiers, setTiers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    loadTiers();
+  }, []);
+
+  const loadTiers = async () => {
+    const { data, error } = await supabase
+      .from('subscription_tiers')
+      .select('*')
+      .order('price_monthly', { ascending: true });
+
+    if (!error && data) {
+      setTiers(data);
+      if (data.length > 0) {
+        setTierId(data[0].id);
+      }
+    }
+    setLoading(false);
+  };
+
+  const validatePhone = (phone: string) => {
+    const e164Regex = /^\+[1-9]\d{1,14}$/;
+    return e164Regex.test(phone);
+  };
+
+  const handleCreate = async () => {
+    if (!companyName.trim()) {
+      alert('Company name is required');
+      return;
+    }
+
+    if (!email.trim() || !email.includes('@')) {
+      alert('Valid email address is required');
+      return;
+    }
+
+    if (phone && !validatePhone(phone)) {
+      alert('Phone number must be in E.164 format (e.g., +1234567890)');
+      return;
+    }
+
+    if (!tierId) {
+      alert('Please select a subscription tier');
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const password = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12);
+
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: email.trim(),
+        password: password,
+        email_confirm: true,
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error('Failed to create user');
+
+      const { error: businessError } = await supabase
+        .from('businesses')
+        .insert({
+          id: authData.user.id,
+          company_name: companyName.trim(),
+          email: email.trim(),
+          phone: phone.trim() || null,
+          tier_id: tierId,
+          subscription_status: 'trial',
+          tenant_id: authData.user.id,
+          email_verified: true,
+          phone_verified: false,
+          onboarding_status: 'completed',
+          onboarding_completed_at: new Date().toISOString(),
+        });
+
+      if (businessError) throw businessError;
+
+      if (phone.trim()) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            await fetch(
+              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-business-to-brevo`,
+              {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${session.access_token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  businessId: authData.user.id,
+                  businessPhone: phone.trim(),
+                  businessName: companyName.trim(),
+                  businessEmail: email.trim(),
+                }),
+              }
+            );
+          }
+        } catch (syncError) {
+          console.error('Brevo sync failed (non-fatal):', syncError);
+        }
+      }
+
+      alert(`Company created successfully!\n\nLogin credentials:\nEmail: ${email}\nPassword: ${password}\n\nPlease save these credentials and share them with the client.`);
+      onCreated();
+      onClose();
+    } catch (error) {
+      console.error('Error creating company:', error);
+      alert(`Failed to create company: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div
+        className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-white">Create New Company</h2>
+            <p className="text-sm text-gray-400 mt-1">Manually add a new business account</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-white transition text-2xl">
+            ×
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Company Name <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Acme Corporation"
+                  className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Email Address <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@acme.com"
+                  className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Mobile Number
+                </label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+1234567890"
+                  className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
+                />
+                <p className="text-xs text-gray-500 mt-1.5">
+                  E.164 format required (e.g., +1234567890). Will be synced to Brevo contact list.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Subscription Tier <span className="text-red-400">*</span>
+                </label>
+                <select
+                  value={tierId}
+                  onChange={(e) => setTierId(e.target.value)}
+                  className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
+                >
+                  {tiers.map((tier) => (
+                    <option key={tier.id} value={tier.id}>
+                      {tier.name} - ${parseFloat(tier.price_monthly).toFixed(2)}/month
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-gray-400">
+                    <p className="text-blue-400 font-medium mb-1">Important:</p>
+                    <ul className="space-y-1 list-disc list-inside">
+                      <li>A secure random password will be generated automatically</li>
+                      <li>Login credentials will be displayed after creation - save them securely</li>
+                      <li>The company will be created with trial status</li>
+                      <li>Mobile number (if provided) will be synced to Brevo contact list</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-zinc-800 flex gap-3">
+          <button
+            onClick={onClose}
+            disabled={creating}
+            className="flex-1 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleCreate}
+            disabled={creating || loading}
+            className="flex-1 px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {creating ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span>Creating...</span>
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4" />
+                <span>Create Company</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>
