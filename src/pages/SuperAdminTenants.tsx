@@ -16,6 +16,7 @@ interface Tenant {
   price_monthly: string;
   usage_customers: number;
   usage_sms_monthly: number;
+  tenant_id: string;
 }
 
 export default function SuperAdminTenants() {
@@ -51,12 +52,14 @@ export default function SuperAdminTenants() {
         usage_customers,
         usage_sms_monthly,
         tier_id,
+        tenant_id,
         subscription_tiers (
           name,
           price_monthly
         )
       `)
       .eq('is_super_admin', false)
+      .not('tenant_id', 'is', null)
       .order('created_at', { ascending: false });
 
     if (!error && data) {
@@ -73,6 +76,7 @@ export default function SuperAdminTenants() {
         price_monthly: t.subscription_tiers?.price_monthly || '0',
         usage_customers: t.usage_customers,
         usage_sms_monthly: t.usage_sms_monthly,
+        tenant_id: t.tenant_id,
       }));
 
       setTenants(formattedTenants);
@@ -297,7 +301,7 @@ function TenantDetailsModal({ tenant, onClose, onDeleted }: { tenant: Tenant; on
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ tenant_id: tenant.id }),
+          body: JSON.stringify({ tenant_id: tenant.tenant_id }),
         }
       );
 
@@ -367,7 +371,7 @@ function TenantDetailsModal({ tenant, onClose, onDeleted }: { tenant: Tenant; on
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            tenant_id: tenant.id,
+            tenant_id: tenant.tenant_id,
             reason: deletionReason || 'No reason provided',
             data_exported: dataExported,
           }),
