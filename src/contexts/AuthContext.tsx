@@ -61,25 +61,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isTenantAdmin, setIsTenantAdmin] = useState(false);
 
   useEffect(() => {
-    const sessionTimeout = setTimeout(() => {
-      console.warn('Session check timed out');
-      setLoading(false);
-    }, 5000);
+    const initAuth = async () => {
+      try {
+        // Check for cached auth state first
+        const cachedAuthState = sessionStorage.getItem('auth_state');
+        const cachedTimestamp = sessionStorage.getItem('auth_timestamp');
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      clearTimeout(sessionTimeout);
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadBusiness(session.user.id);
-      } else {
+        // Use cache if less than 30 seconds old
+        if (cachedAuthState && cachedTimestamp) {
+          const age = Date.now() - parseInt(cachedTimestamp);
+          if (age < 30000) {
+            const cached = JSON.parse(cachedAuthState);
+            if (cached.user) {
+              setUser(cached.user);
+              setBusiness(cached.business);
+              setTenant(cached.tenant);
+              setIsSuperAdmin(cached.isSuperAdmin);
+              setIsTenantAdmin(cached.isTenantAdmin);
+              setLoading(false);
+              // Refresh in background
+              loadAuthDataInBackground(cached.user.id);
+              return;
+            }
+          }
+        }
+
+        const sessionTimeout = setTimeout(() => {
+          console.warn('Session check timed out');
+          setLoading(false);
+        }, 2000);
+
+        const { data: { session } } = await supabase.auth.getSession();
+        clearTimeout(sessionTimeout);
+
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          await loadBusiness(session.user.id);
+        } else {
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
         setLoading(false);
       }
-    }).catch((error) => {
-      clearTimeout(sessionTimeout);
-      console.error('Error getting session:', error);
-      setLoading(false);
-    });
+    };
+
+    initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       (async () => {
@@ -100,65 +129,80 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  const loadAuthDataInBackground = async (userId: string) => {
+    try {
+      const { data, error } = await supabase.rpc('get_user_auth_data', { user_id_param: userId });
+
+      if (!error && data) {
+        updateAuthState(data, userId);
+      }
+    } catch (error) {
+      console.error('Background auth refresh failed:', error);
+    }
+  };
+
+  const updateAuthState = (data: any, userId: string) => {
+    if (data.user_type === 'super_admin') {
+      setBusiness(null);
+      setTenant(null);
+      setIsSuperAdmin(true);
+      setIsTenantAdmin(false);
+    } else if (data.user_type === 'business') {
+      setBusiness(data.data);
+      setTenant(data.tenant || null);
+      setIsSuperAdmin(false);
+      setIsTenantAdmin(data.data?.is_tenant_admin || false);
+    }
+
+    // Cache the auth state
+    const cacheData = {
+      user: { id: userId },
+      business: data.user_type === 'business' ? data.data : null,
+      tenant: data.tenant || null,
+      isSuperAdmin: data.user_type === 'super_admin',
+      isTenantAdmin: data.data?.is_tenant_admin || false
+    };
+    sessionStorage.setItem('auth_state', JSON.stringify(cacheData));
+    sessionStorage.setItem('auth_timestamp', Date.now().toString());
+  };
+
   const loadBusiness = async (userId: string) => {
     try {
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Query timeout')), 10000)
+        setTimeout(() => reject(new Error('Query timeout')), 3000)
       );
 
-      const superAdminPromise = supabase
-        .from('super_admins')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
+      // Use the combined RPC function for better performance
+      const authDataPromise = supabase.rpc('get_user_auth_data', { user_id_param: userId });
 
-      const { data: superAdminData, error: superAdminError } = await Promise.race([superAdminPromise, timeoutPromise]);
+      const { data, error } = await Promise.race([authDataPromise, timeoutPromise]);
 
-      if (!superAdminError && superAdminData) {
-        console.log('Loaded super admin data:', superAdminData);
-        setBusiness(null);
-        setTenant(null);
-        setIsSuperAdmin(true);
-        setIsTenantAdmin(false);
-        setLoading(false);
+      if (error) {
+        console.error('Error loading auth data:', error);
+        // Fallback to creating business for OAuth users
+        await createBusinessForOAuthUser(userId);
         return;
       }
 
-      const queryPromise = supabase
-        .from('businesses')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
+      if (!data) {
+        console.warn('No auth data returned for user:', userId);
+        await createBusinessForOAuthUser(userId);
+        return;
+      }
 
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
+      updateAuthState(data, userId);
 
-      if (error) {
-        console.error('Error loading business:', error);
-        setBusiness(null);
-        setTenant(null);
-        setIsSuperAdmin(false);
-        setIsTenantAdmin(false);
-      } else if (data) {
-        console.log('Loaded business data:', data);
-        setBusiness(data);
-        setIsSuperAdmin(false);
-        setIsTenantAdmin(data.is_tenant_admin || false);
-
-        // Load tenant data if business has a tenant
-        if (data.tenant_id) {
-          await loadTenant(data.tenant_id);
-        } else {
-          setTenant(null);
-        }
-      } else {
-        console.warn('No business record found for user:', userId);
-
-        // Create business for any user that doesn't have one
-        // This handles both OAuth users and email/password users whose signup was interrupted
+      // If no user record found, create one for OAuth users
+      if (data.user_type === 'none') {
         await createBusinessForOAuthUser(userId);
       }
     } catch (error) {
-      console.error('Exception loading business:', error);
+      if (error instanceof Error && error.message === 'Query timeout') {
+        console.error('Auth query timed out - showing UI anyway');
+        // Show UI even on timeout to prevent infinite loading
+      } else {
+        console.error('Exception loading business:', error);
+      }
       setBusiness(null);
       setTenant(null);
       setIsSuperAdmin(false);
@@ -444,6 +488,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsSuperAdmin(false);
     setIsTenantAdmin(false);
     setSession(null);
+    // Clear cached auth state
+    sessionStorage.removeItem('auth_state');
+    sessionStorage.removeItem('auth_timestamp');
   };
 
   const resetPassword = async (email: string) => {
