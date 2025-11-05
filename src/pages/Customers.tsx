@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
-import { Menu, Search, Plus, User, Mail, Phone, Calendar, Gift, Upload, MessageSquare } from 'lucide-react';
+import { Menu, Search, Plus, User, Mail, Phone, Calendar, Gift, Upload, MessageSquare, RefreshCw, Check, XCircle, Clock } from 'lucide-react';
 import AddCustomerModal from '../components/AddCustomerModal';
 import UploadCustomersModal from '../components/UploadCustomersModal';
 import FastEmailModal from '../components/FastEmailModal';
@@ -19,6 +19,9 @@ interface Customer {
   total_visits: number;
   opted_in_sms: boolean;
   created_at: string;
+  brevo_contact_id: string | null;
+  brevo_sync_status: string | null;
+  brevo_synced_at: string | null;
 }
 
 export default function Customers() {
@@ -33,6 +36,8 @@ export default function Customers() {
   const [showSmsModal, setShowSmsModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
+  const [syncingCustomerId, setSyncingCustomerId] = useState<string | null>(null);
+  const [bulkSyncing, setBulkSyncing] = useState(false);
 
   useEffect(() => {
     if (business) {
@@ -99,6 +104,77 @@ export default function Customers() {
     setSelectedCustomer(null);
   };
 
+  const handleSyncToBrevo = async (customer: Customer) => {
+    if (!business || !customer.phone) return;
+
+    setSyncingCustomerId(customer.id);
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-customer-to-brevo`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            customerId: customer.id,
+            businessId: business.id,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        loadCustomers();
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+    } finally {
+      setSyncingCustomerId(null);
+    }
+  };
+
+  const handleBulkSyncToBrevo = async () => {
+    if (!business || bulkSyncing) return;
+
+    const customersWithPhone = customers.filter(c => c.phone && (!c.brevo_sync_status || c.brevo_sync_status === 'failed'));
+    if (customersWithPhone.length === 0) {
+      alert('No customers to sync. All customers with phone numbers are already synced.');
+      return;
+    }
+
+    if (!confirm(`Sync ${customersWithPhone.length} customers to Brevo?`)) return;
+
+    setBulkSyncing(true);
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+    };
+
+    for (const customer of customersWithPhone) {
+      try {
+        await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-customer-to-brevo`,
+          {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              customerId: customer.id,
+              businessId: business.id,
+            }),
+          }
+        );
+      } catch (error) {
+        console.error(`Sync error for customer ${customer.id}:`, error);
+      }
+    }
+
+    setBulkSyncing(false);
+    loadCustomers();
+  };
+
   return (
     <div className="min-h-screen bg-black flex">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -122,6 +198,19 @@ export default function Customers() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={handleBulkSyncToBrevo}
+                  disabled={bulkSyncing}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 hover:border-purple-500/40 text-purple-400 rounded-lg transition disabled:opacity-50"
+                  title="Sync all customers with phone numbers to Brevo"
+                >
+                  {bulkSyncing ? (
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-5 h-5" />
+                  )}
+                  <span className="hidden sm:inline">Sync All to Brevo</span>
+                </button>
                 <button
                   onClick={() => setShowUploadModal(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white rounded-lg transition"
@@ -202,6 +291,9 @@ export default function Customers() {
                         Joined
                       </th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        Brevo Sync
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -256,6 +348,49 @@ export default function Customers() {
                             <Calendar className="w-4 h-4" />
                             {new Date(customer.created_at).toLocaleDateString()}
                           </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {customer.phone ? (
+                            <div className="flex items-center gap-2">
+                              {customer.brevo_sync_status === 'synced' ? (
+                                <div className="flex items-center gap-2">
+                                  <Check className="w-4 h-4 text-green-400" />
+                                  <span className="text-xs text-green-400">Synced</span>
+                                </div>
+                              ) : customer.brevo_sync_status === 'failed' ? (
+                                <div className="flex items-center gap-2">
+                                  <XCircle className="w-4 h-4 text-red-400" />
+                                  <button
+                                    onClick={() => handleSyncToBrevo(customer)}
+                                    disabled={syncingCustomerId === customer.id}
+                                    className="text-xs text-red-400 hover:text-red-300 underline disabled:opacity-50"
+                                  >
+                                    Retry
+                                  </button>
+                                </div>
+                              ) : customer.brevo_sync_status === 'pending' ? (
+                                <div className="flex items-center gap-2">
+                                  <Clock className="w-4 h-4 text-yellow-400" />
+                                  <span className="text-xs text-yellow-400">Pending</span>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => handleSyncToBrevo(customer)}
+                                  disabled={syncingCustomerId === customer.id}
+                                  className="flex items-center gap-1 px-2 py-1 text-xs text-blue-400 hover:text-blue-300 border border-blue-500/20 hover:border-blue-500/40 rounded transition disabled:opacity-50"
+                                >
+                                  {syncingCustomerId === customer.id ? (
+                                    <RefreshCw className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <RefreshCw className="w-3 h-3" />
+                                  )}
+                                  Sync
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-500">No phone</span>
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">

@@ -254,6 +254,25 @@ export default function UploadCustomersModal({ onClose, onSuccess }: UploadCusto
         });
       } else if (data) {
         results.success += data.length;
+
+        const headers = {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        };
+
+        data.forEach((customer: any) => {
+          if (customer.phone) {
+            const syncUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-customer-to-brevo`;
+            fetch(syncUrl, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                customerId: customer.id,
+                businessId: business.id,
+              }),
+            }).catch(() => {});
+          }
+        });
       }
 
       setImportProgress(Math.round(((i + batch.length) / rows.length) * 100));

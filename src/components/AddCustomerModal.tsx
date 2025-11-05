@@ -37,7 +37,7 @@ export default function AddCustomerModal({ onClose, onSuccess }: AddCustomerModa
       return;
     }
 
-    const { error: insertError } = await supabase.from('customers').insert({
+    const { data: newCustomer, error: insertError } = await supabase.from('customers').insert({
       business_id: business.id,
       unique_customer_id: uniqueIdData,
       first_name: formData.firstName || null,
@@ -50,10 +50,10 @@ export default function AddCustomerModal({ onClose, onSuccess }: AddCustomerModa
       total_visits: 0,
       opted_in_sms: true,
       opted_in_email: true,
-    });
+    }).select().single();
 
-    if (insertError) {
-      setError(insertError.message);
+    if (insertError || !newCustomer) {
+      setError(insertError?.message || 'Failed to create customer');
       setLoading(false);
       return;
     }
@@ -64,13 +64,25 @@ export default function AddCustomerModal({ onClose, onSuccess }: AddCustomerModa
       .eq('id', business.id);
 
     if (!updateError) {
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-transactional-sms`;
       const headers = {
         'Content-Type': 'application/json',
         'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
       };
 
-      fetch(apiUrl, {
+      if (formData.phone) {
+        const syncUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-customer-to-brevo`;
+        fetch(syncUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            customerId: newCustomer.id,
+            businessId: business.id,
+          }),
+        }).catch(() => {});
+      }
+
+      const smsUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-transactional-sms`;
+      fetch(smsUrl, {
         method: 'POST',
         headers,
         body: JSON.stringify({

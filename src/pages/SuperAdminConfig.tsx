@@ -30,6 +30,7 @@ interface PlatformSettings {
   };
   balance_monitoring_enabled: boolean;
   last_balance_check: string | null;
+  brevo_default_list_id: string | null;
 }
 
 export default function SuperAdminConfig() {
@@ -48,6 +49,7 @@ export default function SuperAdminConfig() {
   const [emailThreshold, setEmailThreshold] = useState(1000);
   const [smsThreshold, setSmsThreshold] = useState(500);
   const [balanceMonitoringEnabled, setBalanceMonitoringEnabled] = useState(true);
+  const [brevoListId, setBrevoListId] = useState('');
 
   useEffect(() => {
     loadTiers();
@@ -82,6 +84,7 @@ export default function SuperAdminConfig() {
       setEmailThreshold(data.balance_thresholds?.email_credits || 1000);
       setSmsThreshold(data.balance_thresholds?.sms_credits || 500);
       setBalanceMonitoringEnabled(data.balance_monitoring_enabled ?? true);
+      setBrevoListId(data.brevo_default_list_id || '');
     }
   };
 
@@ -98,6 +101,7 @@ export default function SuperAdminConfig() {
           sms_credits: smsThreshold,
         },
         balance_monitoring_enabled: balanceMonitoringEnabled,
+        brevo_default_list_id: brevoListId || null,
       })
       .limit(1);
 
@@ -711,6 +715,28 @@ export default function SuperAdminConfig() {
                           </p>
                         </div>
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-black/50 border border-zinc-800 rounded-lg p-6">
+                    <h3 className="text-white font-bold mb-4">Brevo Contact List Configuration</h3>
+                    <p className="text-sm text-gray-400 mb-4">
+                      Configure the default Brevo contact list ID for syncing LoyaltyHub customers. This enables automatic synchronization of customer phone numbers to your Brevo contact list.
+                    </p>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Default Brevo List ID
+                      </label>
+                      <input
+                        type="text"
+                        value={brevoListId}
+                        onChange={(e) => setBrevoListId(e.target.value)}
+                        placeholder="Enter Brevo List ID (e.g., 2)"
+                        className="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-2">
+                        Find your list ID in Brevo dashboard under Contacts → Lists. The ID appears in the URL when viewing a list.
+                      </p>
                     </div>
                   </div>
 
