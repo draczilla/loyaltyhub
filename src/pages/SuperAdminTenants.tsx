@@ -155,10 +155,10 @@ export default function SuperAdminTenants() {
           <div className="mb-6 flex flex-col sm:flex-row gap-4">
             <button
               onClick={() => setShowCreateModal(true)}
-              className="px-4 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg transition flex items-center justify-center gap-2"
+              className="px-4 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg transition flex items-center justify-center gap-2 font-medium"
             >
               <Plus className="w-5 h-5" />
-              <span>Create Company</span>
+              <span>Create New Company</span>
             </button>
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
