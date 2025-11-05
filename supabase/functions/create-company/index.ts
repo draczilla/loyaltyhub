@@ -172,6 +172,25 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const { data: tenantData, error: tenantError } = await supabaseAdmin
+      .from("tenants")
+      .insert({
+        id: authData.user.id,
+        company_name: companyName.trim(),
+        admin_user_id: authData.user.id,
+      })
+      .select()
+      .single();
+
+    if (tenantError) {
+      console.error("Tenant creation error:", tenantError);
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      return new Response(
+        JSON.stringify({ success: false, error: `Failed to create tenant: ${tenantError.message}` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { error: businessError } = await supabaseAdmin.from("businesses").insert({
       id: authData.user.id,
       company_name: companyName.trim(),
@@ -179,15 +198,17 @@ Deno.serve(async (req: Request) => {
       phone: phone?.trim() || null,
       tier_id: tierId,
       subscription_status: "trial",
-      tenant_id: authData.user.id,
+      tenant_id: tenantData.id,
       email_verified: true,
       phone_verified: false,
       onboarding_status: "completed",
       onboarding_completed_at: new Date().toISOString(),
+      is_tenant_admin: true,
     });
 
     if (businessError) {
       console.error("Business creation error:", businessError);
+      await supabaseAdmin.from("tenants").delete().eq("id", tenantData.id);
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
       return new Response(
         JSON.stringify({ success: false, error: businessError.message }),
