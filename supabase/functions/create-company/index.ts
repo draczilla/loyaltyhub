@@ -101,6 +101,54 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    const { data: existingBusiness, error: businessCheckError } = await supabaseAdmin
+      .from("businesses")
+      .select("id, email, company_name")
+      .eq("email", email.trim())
+      .maybeSingle();
+
+    if (existingBusiness) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `A business with email ${email.trim()} already exists: ${existingBusiness.company_name}`,
+        }),
+        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { data: { users }, error: authListError } = await supabaseAdmin.auth.admin.listUsers();
+
+    const orphanedAuthUser = users?.find(u => u.email === email.trim());
+
+    if (orphanedAuthUser) {
+      const { data: correspondingBusiness } = await supabaseAdmin
+        .from("businesses")
+        .select("id")
+        .eq("id", orphanedAuthUser.id)
+        .maybeSingle();
+
+      if (!correspondingBusiness) {
+        console.log(`Found orphaned auth user for ${email.trim()}, cleaning up...`);
+        const { error: cleanupError } = await supabaseAdmin.auth.admin.deleteUser(orphanedAuthUser.id);
+
+        if (cleanupError) {
+          console.error("Failed to clean up orphaned auth user:", cleanupError);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: `Orphaned auth user exists for ${email.trim()} but cleanup failed. Please contact support.`,
+              details: cleanupError.message,
+            }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        console.log(`Successfully cleaned up orphaned auth user for ${email.trim()}`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
     const password = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12);
 
     const { data: authData, error: createUserError } = await supabaseAdmin.auth.admin.createUser({

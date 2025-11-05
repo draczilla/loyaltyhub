@@ -99,6 +99,57 @@ Deno.serve(async (req: Request) => {
 
     const businessIds = businesses?.map(b => b.id) || [];
 
+    let authUsersDeleted = 0;
+    const authDeletionErrors: string[] = [];
+
+    for (const businessId of businessIds) {
+      let retryCount = 0;
+      const maxRetries = 3;
+      let deleted = false;
+
+      while (retryCount < maxRetries && !deleted) {
+        try {
+          const { error: authDeleteError } = await supabase.auth.admin.deleteUser(businessId);
+          if (!authDeleteError) {
+            authUsersDeleted++;
+            deleted = true;
+            console.log(`Successfully deleted auth user ${businessId}`);
+          } else {
+            console.error(`Attempt ${retryCount + 1} - Failed to delete auth user ${businessId}:`, authDeleteError);
+            if (retryCount === maxRetries - 1) {
+              authDeletionErrors.push(`${businessId}: ${authDeleteError.message}`);
+            }
+          }
+        } catch (authError) {
+          console.error(`Attempt ${retryCount + 1} - Error deleting auth user ${businessId}:`, authError);
+          if (retryCount === maxRetries - 1) {
+            authDeletionErrors.push(`${businessId}: ${authError instanceof Error ? authError.message : 'Unknown error'}`);
+          }
+        }
+
+        if (!deleted) {
+          retryCount++;
+          if (retryCount < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+          }
+        }
+      }
+    }
+
+    if (authDeletionErrors.length > 0 && authUsersDeleted === 0) {
+      return new Response(
+        JSON.stringify({
+          error: "Failed to delete auth users - tenant deletion aborted",
+          details: authDeletionErrors,
+          message: "Auth user deletion failed. Please retry or manually clean up auth users before proceeding."
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const { data: deleteResult, error: deleteError } = await supabase.rpc(
       "delete_tenant_and_data",
       {
@@ -114,7 +165,8 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           error: "Failed to delete tenant",
-          details: deleteError.message
+          details: deleteError.message,
+          warning: authDeletionErrors.length > 0 ? "Some auth users may have been deleted but database deletion failed" : undefined
         }),
         {
           status: 500,
@@ -123,26 +175,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    let authUsersDeleted = 0;
-    for (const businessId of businessIds) {
-      try {
-        const { error: authDeleteError } = await supabase.auth.admin.deleteUser(businessId);
-        if (!authDeleteError) {
-          authUsersDeleted++;
-        } else {
-          console.error(`Failed to delete auth user ${businessId}:`, authDeleteError);
-        }
-      } catch (authError) {
-        console.error(`Error deleting auth user ${businessId}:`, authError);
-      }
-    }
-
     return new Response(
       JSON.stringify({
         success: true,
         message: "Tenant and all associated data successfully deleted",
         result: deleteResult,
         authUsersDeleted,
+        authDeletionWarnings: authDeletionErrors.length > 0 ? authDeletionErrors : undefined,
       }),
       {
         status: 200,
