@@ -32,23 +32,39 @@ async function sendSmsViaBrevo(
   message: string
 ): Promise<SmsResult> {
   try {
+    const requestPayload = {
+      sender: sender,
+      recipient: recipientPhone,
+      content: message,
+      type: "transactional",
+    };
+
+    console.log("Brevo SMS API Request:", {
+      url: "https://api.brevo.com/v3/transactionalSMS/sms",
+      sender,
+      recipient: recipientPhone,
+      contentLength: message.length,
+      hasApiKey: !!apiKey,
+    });
+
     const response = await fetch("https://api.brevo.com/v3/transactionalSMS/sms", {
       method: "POST",
       headers: {
         "api-key": apiKey,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        sender: sender,
-        recipient: recipientPhone,
-        content: message,
-        type: "transactional",
-      }),
+      body: JSON.stringify(requestPayload),
     });
+
+    console.log("Brevo SMS API Response Status:", response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Brevo SMS API error:", errorText);
+      console.error("Brevo SMS API error response:", {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText,
+      });
       return {
         success: false,
         error: `Brevo API returned ${response.status}: ${errorText}`,
@@ -57,6 +73,7 @@ async function sendSmsViaBrevo(
     }
 
     const responseData = await response.json();
+    console.log("Brevo SMS API success response:", responseData);
     const messageId = responseData.reference || responseData.messageId;
 
     return {
@@ -65,7 +82,7 @@ async function sendSmsViaBrevo(
       provider: 'brevo',
     };
   } catch (error) {
-    console.error("Error sending SMS via Brevo:", error);
+    console.error("Error sending SMS via Brevo (exception):", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -358,6 +375,15 @@ Deno.serve(async (req: Request) => {
     const hasBrevo = !!(brevoApiKey && brevoSender);
     const hasTwilio = !!(twilioSid && twilioToken && twilioPhone);
 
+    console.log("SMS Provider Configuration Check:", {
+      hasBrevo,
+      hasTwilio,
+      brevoConfigured: { hasApiKey: !!brevoApiKey, hasSender: !!brevoSender },
+      twilioConfigured: { hasSid: !!twilioSid, hasToken: !!twilioToken, hasPhone: !!twilioPhone },
+      isTestSms,
+      recipientPhone: finalRecipientPhone,
+    });
+
     if (!hasBrevo && !hasTwilio) {
       console.error("SMS Provider Configuration Error: No providers configured");
       console.error("Brevo Config:", { hasApiKey: !!brevoApiKey, hasSender: !!brevoSender });
@@ -405,8 +431,16 @@ Deno.serve(async (req: Request) => {
     let sendResult: SmsResult;
     let usedProvider = primaryProvider;
 
+    console.log(`Attempting to send SMS via ${primaryProvider}`, {
+      to: finalRecipientPhone,
+      messageLength: finalMessage.length,
+      isTestSms,
+    });
+
     if (primaryProvider === 'brevo' && hasBrevo) {
+      console.log("Sending via Brevo...");
       sendResult = await sendSmsViaBrevo(brevoApiKey!, brevoSender!, finalRecipientPhone, finalMessage);
+      console.log("Brevo result:", { success: sendResult.success, error: sendResult.error, messageId: sendResult.messageId });
 
       if (!sendResult.success && hasTwilio) {
         console.log(`Brevo failed, falling back to Twilio. Error: ${sendResult.error}`);
@@ -415,9 +449,12 @@ Deno.serve(async (req: Request) => {
 
         sendResult = await sendSmsViaTwilio(twilioSid!, twilioToken!, twilioPhone!, finalRecipientPhone, finalMessage);
         usedProvider = 'twilio';
+        console.log("Twilio fallback result:", { success: sendResult.success, error: sendResult.error });
       }
     } else if (primaryProvider === 'twilio' && hasTwilio) {
+      console.log("Sending via Twilio...");
       sendResult = await sendSmsViaTwilio(twilioSid!, twilioToken!, twilioPhone!, finalRecipientPhone, finalMessage);
+      console.log("Twilio result:", { success: sendResult.success, error: sendResult.error, messageId: sendResult.messageId });
 
       if (!sendResult.success && hasBrevo) {
         console.log(`Twilio failed, falling back to Brevo. Error: ${sendResult.error}`);
@@ -426,15 +463,19 @@ Deno.serve(async (req: Request) => {
 
         sendResult = await sendSmsViaBrevo(brevoApiKey!, brevoSender!, finalRecipientPhone, finalMessage);
         usedProvider = 'brevo';
+        console.log("Brevo fallback result:", { success: sendResult.success, error: sendResult.error });
       }
     } else {
       if (hasBrevo) {
+        console.log("Sending via Brevo (fallback path)...");
         sendResult = await sendSmsViaBrevo(brevoApiKey!, brevoSender!, finalRecipientPhone, finalMessage);
         usedProvider = 'brevo';
       } else {
+        console.log("Sending via Twilio (fallback path)...");
         sendResult = await sendSmsViaTwilio(twilioSid!, twilioToken!, twilioPhone!, finalRecipientPhone, finalMessage);
         usedProvider = 'twilio';
       }
+      console.log("Fallback path result:", { success: sendResult.success, error: sendResult.error });
     }
 
     if (sendResult.success) {

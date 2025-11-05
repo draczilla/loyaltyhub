@@ -124,11 +124,13 @@ export default function SuperAdminTestCommunications() {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.error || 'Failed to send SMS');
+        const errorDetails = result.details ? `\n\nDetails: ${JSON.stringify(result.details, null, 2)}` : '';
+        throw new Error(result.error || 'Failed to send SMS' + errorDetails);
       }
 
       setSuccess(`SMS sent successfully via ${result.provider || 'unknown provider'}! Message ID: ${result.messageId || 'N/A'}`);
     } catch (err) {
+      console.error('SMS Test Error:', err);
       setError(err instanceof Error ? err.message : 'Failed to send SMS');
     } finally {
       setSending(false);
