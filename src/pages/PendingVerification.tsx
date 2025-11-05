@@ -6,9 +6,14 @@ import { useAuth } from '../contexts/AuthContext';
 export default function PendingVerification() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, business, loading } = useAuth();
+  const { user, business, loading, signOut } = useAuth();
   const email = location.state?.email || business?.email;
   const [timeRemaining, setTimeRemaining] = useState(60);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login');
+  };
 
   useEffect(() => {
     if (loading) return;
@@ -100,12 +105,20 @@ export default function PendingVerification() {
           </div>
         </div>
 
-        <div className="mt-6 text-center">
+        <div className="mt-6 text-center flex items-center justify-center gap-4">
+          {user && (
+            <button
+              onClick={handleSignOut}
+              className="text-gray-400 hover:text-white text-sm font-medium transition"
+            >
+              Sign Out
+            </button>
+          )}
           <button
             onClick={() => navigate('/login')}
             className="text-orange-400 hover:text-orange-300 text-sm font-medium transition"
           >
-            {user ? 'Go to Login' : 'Back to Login'}
+            Go to Login
           </button>
         </div>
       </div>
