@@ -177,8 +177,8 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         sender: {
-          name: "AdaptiQ Loyalty Platform",
-          email: "noreply@adaptiq.no",
+          name: "LoyaltyHub",
+          email: "noreply@loyaltyhub.no",
         },
         to: [
           {
