@@ -61,6 +61,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isTenantAdmin, setIsTenantAdmin] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+
     const initAuth = async () => {
       try {
         // Check for cached auth state first
@@ -71,28 +73,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (cachedAuthState && cachedTimestamp) {
           const age = Date.now() - parseInt(cachedTimestamp);
           if (age < 30000) {
-            const cached = JSON.parse(cachedAuthState);
-            if (cached.user) {
-              setUser(cached.user);
-              setBusiness(cached.business);
-              setTenant(cached.tenant);
-              setIsSuperAdmin(cached.isSuperAdmin);
-              setIsTenantAdmin(cached.isTenantAdmin);
-              setLoading(false);
-              // Refresh in background
-              loadAuthDataInBackground(cached.user.id);
-              return;
+            try {
+              const cached = JSON.parse(cachedAuthState);
+              if (cached.user && mounted) {
+                setUser(cached.user);
+                setBusiness(cached.business);
+                setTenant(cached.tenant);
+                setIsSuperAdmin(cached.isSuperAdmin);
+                setIsTenantAdmin(cached.isTenantAdmin);
+                setLoading(false);
+                // Refresh in background
+                loadAuthDataInBackground(cached.user.id);
+                return;
+              }
+            } catch (e) {
+              console.warn('Invalid cached auth state');
+              sessionStorage.removeItem('auth_state');
+              sessionStorage.removeItem('auth_timestamp');
             }
           }
         }
 
-        const sessionTimeout = setTimeout(() => {
-          console.warn('Session check timed out');
-          setLoading(false);
-        }, 2000);
-
         const { data: { session } } = await supabase.auth.getSession();
-        clearTimeout(sessionTimeout);
+
+        if (!mounted) return;
 
         setSession(session);
         setUser(session?.user ?? null);
@@ -104,29 +108,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
     initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      (async () => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await loadBusiness(session.user.id);
-        } else {
-          setBusiness(null);
-          setTenant(null);
-          setIsSuperAdmin(false);
-          setIsTenantAdmin(false);
-          setLoading(false);
-        }
-      })();
+      if (!mounted) return;
+
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        loadBusiness(session.user.id);
+      } else {
+        setBusiness(null);
+        setTenant(null);
+        setIsSuperAdmin(false);
+        setIsTenantAdmin(false);
+        setLoading(false);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const loadAuthDataInBackground = async (userId: string) => {
@@ -168,14 +178,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadBusiness = async (userId: string) => {
     try {
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Query timeout')), 3000)
-      );
-
       // Use the combined RPC function for better performance
-      const authDataPromise = supabase.rpc('get_user_auth_data', { user_id_param: userId });
-
-      const { data, error } = await Promise.race([authDataPromise, timeoutPromise]);
+      const { data, error } = await supabase.rpc('get_user_auth_data', { user_id_param: userId });
 
       if (error) {
         console.error('Error loading auth data:', error);
@@ -197,12 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await createBusinessForOAuthUser(userId);
       }
     } catch (error) {
-      if (error instanceof Error && error.message === 'Query timeout') {
-        console.error('Auth query timed out - showing UI anyway');
-        // Show UI even on timeout to prevent infinite loading
-      } else {
-        console.error('Exception loading business:', error);
-      }
+      console.error('Exception loading business:', error);
       setBusiness(null);
       setTenant(null);
       setIsSuperAdmin(false);
