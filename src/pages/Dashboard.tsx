@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Users, Gift, QrCode, TrendingUp, Menu, CheckCircle, XCircle, AlertCircle, Mail, Eye, Info } from 'lucide-react';
+import { Users, Gift, QrCode, TrendingUp, Menu, CheckCircle, XCircle, AlertCircle, Mail, Eye, Info, LineChart } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import AddCustomerModal from '../components/AddCustomerModal';
 
@@ -13,6 +13,11 @@ interface DashboardStats {
   newCustomersThisMonth: number;
   emailsSent: number;
   emailOpenRate: number;
+}
+
+interface CustomerGrowthData {
+  month: string;
+  customers: number;
 }
 
 export default function Dashboard() {
@@ -31,6 +36,7 @@ export default function Dashboard() {
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
   const [paymentNotification, setPaymentNotification] = useState<'success' | 'cancelled' | null>(null);
   const [showVerificationBanner, setShowVerificationBanner] = useState(true);
+  const [customerGrowth, setCustomerGrowth] = useState<CustomerGrowthData[]>([]);
 
   useEffect(() => {
     if (business) {
@@ -92,6 +98,31 @@ export default function Dashboard() {
       emailsSent: totalEmails,
       emailOpenRate,
     });
+
+    const growthData = calculateCustomerGrowth(customersResult.data || []);
+    setCustomerGrowth(growthData);
+  };
+
+  const calculateCustomerGrowth = (customers: Array<{ created_at: string }>) => {
+    const now = new Date();
+    const monthsData: CustomerGrowthData[] = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+      const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59);
+
+      const customersUpToMonth = customers.filter(
+        c => new Date(c.created_at) <= monthEnd
+      ).length;
+
+      monthsData.push({
+        month: date.toLocaleDateString('en-US', { month: 'short' }),
+        customers: customersUpToMonth,
+      });
+    }
+
+    return monthsData;
   };
 
   return (
@@ -297,6 +328,72 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-8">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
+                <LineChart className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-white">Customer Growth</h2>
+                <p className="text-sm text-gray-400">Total customers over the last 6 months</p>
+              </div>
+            </div>
+
+            <div className="relative" style={{ height: '300px' }}>
+              <div className="absolute inset-0 flex items-end justify-between gap-4 px-4">
+                {customerGrowth.map((data, index) => {
+                  const maxCustomers = Math.max(...customerGrowth.map(d => d.customers), 10);
+                  const heightPercentage = maxCustomers > 0 ? (data.customers / maxCustomers) * 100 : 0;
+                  const isLatest = index === customerGrowth.length - 1;
+
+                  return (
+                    <div key={data.month} className="flex-1 flex flex-col items-center justify-end h-full group">
+                      <div className="relative w-full flex flex-col items-center justify-end h-full mb-2">
+                        <div className="absolute -top-8 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800 border border-zinc-700 px-3 py-1 rounded-lg">
+                          <span className="text-white font-bold text-sm">{data.customers}</span>
+                        </div>
+                        <div
+                          className={`w-full rounded-t-lg transition-all duration-500 ease-out ${
+                            isLatest
+                              ? 'bg-gradient-to-t from-orange-500 to-orange-400'
+                              : 'bg-gradient-to-t from-orange-500/60 to-orange-400/60 group-hover:from-orange-500 group-hover:to-orange-400'
+                          }`}
+                          style={{
+                            height: `${heightPercentage}%`,
+                            minHeight: data.customers > 0 ? '4px' : '0px',
+                          }}
+                        />
+                      </div>
+                      <div className="text-center mt-2">
+                        <div className={`text-sm font-medium ${isLatest ? 'text-orange-400' : 'text-gray-400'}`}>
+                          {data.month}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">{data.customers}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {customerGrowth.length > 1 && (
+              <div className="mt-6 pt-4 border-t border-zinc-800">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-green-400" />
+                    <span className="text-gray-400">Growth Rate:</span>
+                    <span className="text-white font-medium">
+                      {customerGrowth[customerGrowth.length - 1].customers - customerGrowth[0].customers > 0
+                        ? `+${customerGrowth[customerGrowth.length - 1].customers - customerGrowth[0].customers}`
+                        : customerGrowth[customerGrowth.length - 1].customers - customerGrowth[0].customers} customers
+                    </span>
+                  </div>
+                  <div className="text-gray-500">Last 6 months</div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
