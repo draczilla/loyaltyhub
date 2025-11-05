@@ -72,10 +72,11 @@ Create diverse loyalty programs tailored to your business model:
 
 ### Backend & Services
 - **Supabase** - PostgreSQL database with real-time capabilities
-- **Supabase Auth** - Email/password and Google OAuth authentication with Row Level Security
+- **Supabase Auth** - Email/password authentication with Row Level Security
 - **Supabase Edge Functions** - Serverless functions for SMS and email delivery
-- **SendGrid** - Transactional email delivery with tracking
-- **Twilio** - SMS messaging with alphanumeric sender IDs
+- **Brevo (Sendinblue)** - Transactional email and SMS delivery with tracking
+- **Vonage** - SMS messaging with branded sender IDs
+- **Stripe** - Payment processing and subscription management
 - **QRCode** - Dynamic QR code generation
 
 ### Key Libraries
@@ -112,91 +113,121 @@ Create diverse loyalty programs tailored to your business model:
 - **Enterprise Security** - Built on Supabase with automatic backups and RLS policies
 - **Mobile Responsive** - Works perfectly on all devices from desktop to mobile
 
-## Twilio Integration
+## Multi-Tenant Architecture
 
-LoyaltyHub uses Twilio for SMS messaging with Alphanumeric Sender IDs. The platform supports two credential models:
+LoyaltyHub is built with a comprehensive multi-tenant system that supports business isolation, team collaboration, and enterprise-grade verification.
 
-### Platform-Level Credentials (Fallback)
-Configure platform-wide Twilio credentials that all businesses can use by default:
+### Tenant Management
+- **Tenant Isolation** - Each business operates in a completely isolated environment with secure data separation
+- **Team Collaboration** - Invite team members with role-based access control (Owner, Admin, Member)
+- **Subscription Tiers** - Flexible pricing with Free, Pro, and Agency plans
+- **Usage Tracking** - Monitor SMS and email credits, customer counts, and feature usage
+- **White-Label Ready** - Customizable branding for agency clients
 
-1. Add your Twilio credentials to the `.env` file:
-   - `TWILIO_ACCOUNT_SID` - Your Twilio Account SID
-   - `TWILIO_AUTH_TOKEN` - Your Twilio Auth Token
-   - `TWILIO_SENDER_ID` - Your alphanumeric sender ID (3-11 characters, letters and numbers only)
+### Email and Phone Verification System
 
-2. Add the same credentials to Supabase Edge Function secrets:
-   - Navigate to Supabase Dashboard > Project Settings > Edge Functions > Secrets
-   - Add all three Twilio environment variables
-   - These secrets allow the `send-transactional-sms` function to access credentials
+All new business accounts must verify both email and phone before accessing the platform:
 
-### Alphanumeric Sender ID Information
+#### Email Verification
+- Automated welcome emails sent via Brevo with verification links
+- 24-hour token expiration for security
+- Rate limiting (3 attempts per hour) to prevent abuse
+- Tracking of all verification attempts in audit logs
+- Beautiful HTML email templates with branding
 
-Alphanumeric Sender IDs allow you to send SMS messages with a custom branded name instead of a phone number:
+#### Phone Verification
+- SMS verification codes sent via Vonage
+- 10-minute code expiration
+- Rate limiting (3 attempts per hour)
+- Support for international phone numbers
+- Verification required before dashboard access
 
-- **Requirements**: 3-11 characters, alphanumeric only (A-Z, a-z, 0-9), no spaces or special characters
-- **Examples**: YourBrand, MyStore, LoyaltyHub, Shop123
-- **One-way messaging**: Customers cannot reply to messages sent from alphanumeric sender IDs
-- **Country restrictions**: May require pre-registration in some countries (check Twilio's documentation for your target region)
-- **Fallback**: If the sender ID is not supported in the recipient's country, Twilio may use a shared short code or long code instead
+#### Onboarding Flow
+1. User signs up with email and password
+2. Email verification sent automatically
+3. After email verification, phone verification required
+4. Full access granted after both verifications complete
+5. Onboarding status tracked: `pending_email` → `pending_phone` → `completed`
 
-### Business-Specific Credentials (Priority)
-Businesses can optionally configure their own Twilio accounts through the integrations table in the database. When present, business-specific credentials take priority over platform-level credentials. Business integrations support both alphanumeric sender IDs and phone numbers for backward compatibility.
+### Communication Infrastructure
 
-### Credential Priority
-The SMS system checks for credentials in this order:
-1. **Business Integration** - Checks the `integrations` table for active Twilio credentials
-2. **Platform Fallback** - Uses platform-level environment variables if no business integration exists
+#### Brevo Integration (Email)
+LoyaltyHub uses Brevo for all transactional emails:
+- Welcome and verification emails
+- Team invitation emails
+- Password reset emails
+- System alerts and notifications
+- Email open/click tracking with pixel tracking
+- Daily allowance tracking (300 emails/day default)
 
-This flexibility allows you to provide a default SMS service while letting businesses use their own Twilio accounts for greater control and cost management.
+**Configuration**:
+- `BREVO_API_KEY` - Brevo API key for email delivery
+- `APP_URL` - Production domain for verification links (e.g., `https://loyaltyhub.no`)
+- Sender email: `noreply@loyaltyhub.no` (must be verified in Brevo)
+
+#### Vonage Integration (SMS)
+LoyaltyHub uses Vonage for SMS messaging:
+- Phone verification codes
+- Transactional SMS notifications
+- Marketing campaign messages
+- Support for branded sender IDs
+
+**Configuration**:
+- `VONAGE_API_KEY` - Vonage API key
+- `VONAGE_API_SECRET` - Vonage API secret
+- `VONAGE_BRAND_NAME` - Sender name (e.g., "LoyaltyHub")
+
+### Super Admin Portal
+
+The platform includes a powerful super admin interface for platform management:
+
+#### Features
+- **Tenant Management** - View all businesses, subscription status, and usage metrics
+- **Credit Management** - Allocate SMS/email credits and monitor consumption
+- **Communication Logs** - Audit trail of all emails and SMS sent platform-wide
+- **Brevo Balance Monitoring** - Real-time tracking of Brevo email credits
+- **Platform Configuration** - Manage global settings, rate limits, and defaults
+- **Test Communications** - Send test emails and SMS to verify configuration
+
+#### Access Control
+- Super admins tracked in dedicated `super_admins` table
+- Role-based policies restrict access to sensitive operations
+- All super admin actions logged for audit compliance
+
+### Team Invitations
+
+Businesses can invite team members to collaborate:
+
+1. **Send Invitation** - Business owner/admin sends email invitation
+2. **Email Delivery** - Invitation sent via Brevo with unique token
+3. **Acceptance** - Invited user clicks link and creates account
+4. **Role Assignment** - User added to team with specified role
+5. **Access Granted** - Team member can access business dashboard
+
+**Invitation Features**:
+- Token expiration (7 days default)
+- One-time use tokens
+- Role selection: Owner, Admin, Member
+- Automatic tenant association
+- Email verification required before access
 
 ## Authentication
 
-LoyaltyHub supports multiple authentication methods:
+LoyaltyHub uses Supabase Auth with email/password authentication:
 
 ### Email/Password Authentication
-Traditional email and password signup with secure password hashing and email verification support.
+- Secure password hashing with bcrypt
+- Email and phone verification required for new accounts
+- Password reset via email
+- Session management with JWTs
+- Row Level Security (RLS) policies enforce data isolation
 
-### Google OAuth
-Users can sign in with their Google accounts for a seamless onboarding experience.
-
-#### Setting up Google OAuth
-
-1. **Create Google OAuth Credentials**:
-   - Go to the [Google Cloud Console](https://console.cloud.google.com/)
-   - Create a new project or select an existing one
-   - Navigate to "APIs & Services" > "Credentials"
-   - Click "Create Credentials" > "OAuth 2.0 Client ID"
-   - Configure the OAuth consent screen if not already done
-   - Select "Web application" as the application type
-   - Add authorized JavaScript origins:
-     - `http://localhost:5173` (for local development)
-     - Your production domain (e.g., `https://yourdomain.com`)
-   - Add authorized redirect URIs:
-     - `http://localhost:54321/auth/v1/callback` (for local Supabase)
-     - `https://your-project-ref.supabase.co/auth/v1/callback` (for production)
-   - Copy the Client ID and Client Secret
-
-2. **Configure Supabase**:
-   - Go to your Supabase Dashboard
-   - Navigate to "Authentication" > "Providers"
-   - Find "Google" in the list and enable it
-   - Enter your Google Client ID and Client Secret
-   - Save the configuration
-
-3. **Update Redirect URLs** (if needed):
-   - In the Supabase dashboard, go to "Authentication" > "URL Configuration"
-   - Ensure your site URL and redirect URLs are properly configured
-
-#### How It Works
-
-When users click "Sign in with Google":
-1. They're redirected to Google's OAuth consent screen
-2. After authorizing, they're redirected back to your app
-3. If it's their first time signing in, a business account is automatically created with:
-   - Company name derived from their Google display name
-   - Email from their Google account
-   - Free tier subscription
-4. They're automatically logged in and redirected to the dashboard
+### Security Features
+- **Rate Limiting** - Protects against brute force attacks on verification endpoints
+- **Token Expiration** - Email tokens expire in 24 hours, SMS codes in 10 minutes
+- **Verification Tracking** - All verification attempts logged with results
+- **Session Management** - Automatic token refresh and logout on expiration
+- **RLS Policies** - Database-level security enforces tenant isolation
 
 ## Getting Started
 
@@ -233,15 +264,22 @@ VITE_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
 STRIPE_SECRET_KEY=your_stripe_secret_key
 STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
 
-# Twilio Configuration (Platform-Level)
-TWILIO_ACCOUNT_SID=your_twilio_account_sid
-TWILIO_AUTH_TOKEN=your_twilio_auth_token
-TWILIO_SENDER_ID=your_alphanumeric_sender_id
+# Brevo Configuration (Email)
+BREVO_API_KEY=your_brevo_api_key
+
+# Vonage Configuration (SMS)
+VONAGE_API_KEY=your_vonage_api_key
+VONAGE_API_SECRET=your_vonage_api_secret
+VONAGE_BRAND_NAME=LoyaltyHub
+
+# Application Configuration
+APP_URL=https://loyaltyhub.no
 ```
 
-**Important**: For Supabase Edge Functions to access Twilio credentials, you must also add them to your Supabase project:
+**Important**: For Supabase Edge Functions to access these credentials, you must also add them to your Supabase project:
 - Go to Supabase Dashboard > Project Settings > Edge Functions > Secrets
-- Add `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_SENDER_ID`
+- Add all environment variables listed above
+- Verify sender email (`noreply@loyaltyhub.no`) in Brevo dashboard
 
 4. Run the development server:
 ```bash
@@ -312,13 +350,30 @@ loyaltyhub/
 
 The application uses Supabase PostgreSQL with the following core tables:
 
-- **businesses** - Business account information and subscription details
+### Core Tables
+- **tenants** - Top-level business accounts with subscription management
+- **businesses** - Business profiles and settings (linked to tenants)
+- **tenant_members** - Team members with role-based access
+- **tenant_invitations** - Pending team invitations with tokens
 - **customers** - Customer profiles and contact information
 - **loyalty_programs** - Reward program configurations
 - **transactions** - Customer activity and point tracking
 - **campaigns** - SMS campaign definitions
 - **sms_templates** - Reusable message templates
+- **email_templates** - Reusable email templates
 - **subscription_tiers** - Plan definitions and limits
+
+### Verification & Security
+- **verification_tokens** - Email and phone verification tokens
+- **verification_attempts** - Audit log of all verification attempts
+- **communication_logs** - Complete log of all emails and SMS sent
+- **email_tracking_pixels** - Track email opens with pixel tracking
+
+### Platform Management
+- **super_admins** - Platform administrators
+- **platform_settings** - Global configuration
+- **brevo_balance_logs** - Daily Brevo credit balance snapshots
+- **daily_email_allowances** - Per-tenant daily email limits
 
 All tables implement Row Level Security (RLS) policies to ensure data isolation and security.
 
@@ -332,24 +387,26 @@ All tables implement Row Level Security (RLS) policies to ensure data isolation 
 - QR code generation
 - Customer management
 
-### Pro Tier
+### Pro Tier ($29/month)
 - 500 customers maximum
 - 3 active loyalty programs
 - 500 SMS messages per month
+- 1,000 emails per month
 - Advanced analytics
-- MailChimp integration
 - Email campaigns
+- Team collaboration (up to 3 members)
 - Priority support
 
-### Agency Tier
+### Agency Tier ($99/month)
 - Unlimited customers
 - Unlimited loyalty programs
 - 5,000 SMS messages per month
+- 10,000 emails per month
 - Advanced analytics
 - White-label options
+- Unlimited team members
 - Custom domain support
-- MailChimp integration
-- Priority support
+- Dedicated support
 
 ## Contributing
 
