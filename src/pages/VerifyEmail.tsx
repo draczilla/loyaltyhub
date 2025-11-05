@@ -41,11 +41,7 @@ export default function VerifyEmail() {
         setNextStep(data.next_step);
 
         setTimeout(() => {
-          if (data.next_step === 'phone_verification') {
-            navigate('/verify-phone-setup');
-          } else {
-            navigate('/dashboard');
-          }
+          navigate('/login?verified=email');
         }, 2000);
       } else {
         setStatus('error');
@@ -138,13 +134,11 @@ export default function VerifyEmail() {
                 </div>
                 <h1 className="text-2xl font-bold text-white mb-2">Email Verified!</h1>
                 <p className="text-gray-400 mb-4">{message}</p>
-                {nextStep === 'phone_verification' && (
-                  <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4 mt-4">
-                    <p className="text-orange-400 text-sm">
-                      Redirecting to phone verification...
-                    </p>
-                  </div>
-                )}
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mt-4">
+                  <p className="text-blue-400 text-sm">
+                    Redirecting to login...
+                  </p>
+                </div>
               </>
             )}
 

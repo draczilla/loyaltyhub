@@ -1,25 +1,40 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { LogIn, ArrowLeft } from 'lucide-react';
+import { LogIn, ArrowLeft, CheckCircle } from 'lucide-react';
 
 export default function Login() {
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, signInWithGoogle, isSuperAdmin, loading: authLoading, user } = useAuth();
+  const [successMessage, setSuccessMessage] = useState('');
+  const { signIn, signInWithGoogle, isSuperAdmin, business, loading: authLoading, user } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const verified = searchParams.get('verified');
+    if (verified === 'email') {
+      setSuccessMessage('Email verified! Please sign in to continue with phone verification.');
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!authLoading && user) {
       if (isSuperAdmin) {
         navigate('/admin/dashboard');
-      } else {
-        navigate('/dashboard');
+      } else if (business) {
+        if (!business.email_verified) {
+          navigate('/pending-verification');
+        } else if (!business.phone_verified) {
+          navigate('/verify-phone-setup');
+        } else {
+          navigate('/dashboard');
+        }
       }
     }
-  }, [isSuperAdmin, authLoading, user, navigate]);
+  }, [isSuperAdmin, authLoading, user, business, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,6 +79,12 @@ export default function Login() {
 
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {successMessage && (
+              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 flex items-start gap-3">
+                <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                <p className="text-green-400 text-sm">{successMessage}</p>
+              </div>
+            )}
             {error && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
                 <p className="text-red-400 text-sm">{error}</p>
