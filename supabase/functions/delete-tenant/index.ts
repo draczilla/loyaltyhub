@@ -26,7 +26,6 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get the user from the request
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -51,7 +50,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Verify user is super admin
     const { data: superAdmin, error: superAdminError } = await supabase
       .from("super_admins")
       .select("id")
@@ -68,7 +66,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Parse request body
     const { tenant_id, reason, data_exported }: DeleteRequest = await req.json();
 
     if (!tenant_id) {
@@ -91,7 +88,17 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Call the database function to delete tenant and all data
+    const { data: businesses, error: businessError } = await supabase
+      .from("businesses")
+      .select("id")
+      .eq("tenant_id", tenant_id);
+
+    if (businessError) {
+      console.error("Error fetching businesses:", businessError);
+    }
+
+    const businessIds = businesses?.map(b => b.id) || [];
+
     const { data: deleteResult, error: deleteError } = await supabase.rpc(
       "delete_tenant_and_data",
       {
@@ -116,11 +123,26 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    let authUsersDeleted = 0;
+    for (const businessId of businessIds) {
+      try {
+        const { error: authDeleteError } = await supabase.auth.admin.deleteUser(businessId);
+        if (!authDeleteError) {
+          authUsersDeleted++;
+        } else {
+          console.error(`Failed to delete auth user ${businessId}:`, authDeleteError);
+        }
+      } catch (authError) {
+        console.error(`Error deleting auth user ${businessId}:`, authError);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         message: "Tenant and all associated data successfully deleted",
         result: deleteResult,
+        authUsersDeleted,
       }),
       {
         status: 200,
