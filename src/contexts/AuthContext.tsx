@@ -62,13 +62,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    console.log('[AuthContext] Initializing authentication');
 
     const initAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        console.log('[AuthContext] Fetching session from Supabase');
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-        if (!mounted) return;
+        if (sessionError) {
+          console.error('[AuthContext] Error fetching session:', sessionError);
+        }
 
+        if (!mounted) {
+          console.log('[AuthContext] Component unmounted, aborting');
+          return;
+        }
+
+        console.log('[AuthContext] Session:', session ? 'User logged in' : 'No session');
         setSession(session);
         setUser(session?.user ?? null);
 
@@ -101,16 +111,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           }
           // No valid cache, load fresh data
+          console.log('[AuthContext] Loading fresh business data');
           await loadBusiness(session.user.id);
         } else {
           // Clear any stale cache
+          console.log('[AuthContext] No session, clearing cache and setting loading to false');
           sessionStorage.removeItem('auth_state');
           sessionStorage.removeItem('auth_timestamp');
           setLoading(false);
         }
       } catch (error) {
-        console.error('Error initializing auth:', error);
+        console.error('[AuthContext] Error initializing auth:', error);
         if (mounted) {
+          console.log('[AuthContext] Setting loading to false due to error');
           setLoading(false);
         }
       }
