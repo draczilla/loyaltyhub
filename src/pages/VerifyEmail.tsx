@@ -35,18 +35,20 @@ export default function VerifyEmail() {
         throw error;
       }
 
-      if (data.success) {
-        setStatus('success');
-        setMessage(data.message || 'Email verified successfully!');
-        setNextStep(data.next_step);
+      if (data && typeof data === 'object' && 'success' in data) {
+        if (data.success) {
+          setStatus('success');
+          setMessage((data as any).message || 'Email verified successfully!');
+          setNextStep((data as any).next_step || '');
 
-        setTimeout(() => {
-          navigate('/login?verified=email');
-        }, 2000);
-      } else {
-        setStatus('error');
-        setMessage(data.message || 'Verification failed');
-        setNextStep(data.next_step);
+          setTimeout(() => {
+            navigate('/login?verified=email');
+          }, 2000);
+        } else {
+          setStatus('error');
+          setMessage((data as any).message || 'Verification failed');
+          setNextStep((data as any).next_step || 'login');
+        }
       }
     } catch (err) {
       console.error('Verification error:', err);
