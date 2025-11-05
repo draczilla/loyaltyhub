@@ -112,6 +112,13 @@ export default function SuperAdminTestCommunications() {
       }
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-transactional-sms`;
+
+      console.log('Sending SMS test request:', {
+        url: apiUrl,
+        body: requestBody,
+        hasAuth: !!session.access_token,
+      });
+
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -121,7 +128,17 @@ export default function SuperAdminTestCommunications() {
         body: JSON.stringify(requestBody),
       });
 
-      const result = await response.json();
+      console.log('SMS test response status:', response.status);
+
+      let result;
+      try {
+        result = await response.json();
+        console.log('SMS test response body:', result);
+      } catch (parseError) {
+        const text = await response.text();
+        console.error('Failed to parse response as JSON:', text);
+        throw new Error(`Server returned ${response.status}: ${text}`);
+      }
 
       if (!response.ok || !result.success) {
         const errorDetails = result.details ? `\n\nDetails: ${JSON.stringify(result.details, null, 2)}` : '';
