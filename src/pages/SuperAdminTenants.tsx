@@ -920,62 +920,42 @@ function CreateCompanyModal({ onClose, onCreated }: { onClose: () => void; onCre
 
     setCreating(true);
     try {
-      const password = Math.random().toString(36).slice(-12) + Math.random().toString(36).slice(-12);
-
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: email.trim(),
-        password: password,
-        email_confirm: true,
-      });
-
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Failed to create user');
-
-      const { error: businessError } = await supabase
-        .from('businesses')
-        .insert({
-          id: authData.user.id,
-          company_name: companyName.trim(),
-          email: email.trim(),
-          phone: phone.trim() || null,
-          tier_id: tierId,
-          subscription_status: 'trial',
-          tenant_id: authData.user.id,
-          email_verified: true,
-          phone_verified: false,
-          onboarding_status: 'completed',
-          onboarding_completed_at: new Date().toISOString(),
-        });
-
-      if (businessError) throw businessError;
-
-      if (phone.trim()) {
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            await fetch(
-              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-business-to-brevo`,
-              {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${session.access_token}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  businessId: authData.user.id,
-                  businessPhone: phone.trim(),
-                  businessName: companyName.trim(),
-                  businessEmail: email.trim(),
-                }),
-              }
-            );
-          }
-        } catch (syncError) {
-          console.error('Brevo sync failed (non-fatal):', syncError);
-        }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('Not authenticated');
+        return;
       }
 
-      alert(`Company created successfully!\n\nLogin credentials:\nEmail: ${email}\nPassword: ${password}\n\nPlease save these credentials and share them with the client.`);
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-company`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            companyName: companyName.trim(),
+            email: email.trim(),
+            phone: phone.trim() || null,
+            tierId: tierId,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create company');
+      }
+
+      const brevoMessage = phone.trim()
+        ? (result.brevoSynced
+          ? '\n\nThe mobile number has been synced to Brevo contact list.'
+          : '\n\nNote: Brevo sync was attempted but may have failed (non-critical).')
+        : '';
+
+      alert(`Company created successfully!${brevoMessage}\n\nLogin credentials:\nEmail: ${email}\nPassword: ${result.password}\n\nPlease save these credentials and share them with the client.`);
       onCreated();
       onClose();
     } catch (error) {
