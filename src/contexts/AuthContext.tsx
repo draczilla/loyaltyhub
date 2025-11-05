@@ -62,6 +62,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    let timeoutId: NodeJS.Timeout;
+
     console.log('[AuthContext] Initializing authentication');
 
     const initAuth = async () => {
@@ -104,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   return;
                 }
               } catch (e) {
-                console.warn('Invalid cached auth state');
+                console.warn('[AuthContext] Invalid cached auth state');
                 sessionStorage.removeItem('auth_state');
                 sessionStorage.removeItem('auth_timestamp');
               }
@@ -129,6 +131,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    // Set a timeout to force loading to false after 10 seconds
+    timeoutId = setTimeout(() => {
+      if (mounted && loading) {
+        console.error('[AuthContext] Auth initialization timeout - forcing loading to false');
+        setLoading(false);
+      }
+    }, 10000);
+
     initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -150,6 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false;
+      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);
