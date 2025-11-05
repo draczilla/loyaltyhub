@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Menu, Search, ExternalLink, CreditCard, Calendar, Mail, Building } from 'lucide-react';
+import { Menu, Search, ExternalLink, CreditCard, Calendar, Mail, Building, Download, Trash2, AlertTriangle } from 'lucide-react';
 import SuperAdminSidebar from '../components/SuperAdminSidebar';
 import { supabase } from '../lib/supabase';
 
@@ -260,13 +260,312 @@ export default function SuperAdminTenants() {
       </div>
 
       {selectedTenant && (
-        <TenantDetailsModal tenant={selectedTenant} onClose={() => setSelectedTenant(null)} />
+        <TenantDetailsModal
+          tenant={selectedTenant}
+          onClose={() => setSelectedTenant(null)}
+          onDeleted={loadTenants}
+        />
       )}
     </div>
   );
 }
 
-function TenantDetailsModal({ tenant, onClose }: { tenant: Tenant; onClose: () => void }) {
+function TenantDetailsModal({ tenant, onClose, onDeleted }: { tenant: Tenant; onClose: () => void; onDeleted: () => void }) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDataExport, setShowDataExport] = useState(false);
+  const [exportingData, setExportingData] = useState(false);
+  const [dataExported, setDataExported] = useState(false);
+  const [deletionReason, setDeletionReason] = useState('');
+  const [confirmDataExported, setConfirmDataExported] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [exportSummary, setExportSummary] = useState<any>(null);
+
+  const handleExportData = async () => {
+    setExportingData(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('Not authenticated');
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/export-tenant-data`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ tenant_id: tenant.id }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to export data');
+      }
+
+      const result = await response.json();
+      setExportSummary(result.summary);
+
+      const blob = new Blob([JSON.stringify(result.data, null, 2)], {
+        type: 'application/json',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tenant-${tenant.company_name.replace(/\s+/g, '-')}-export-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      setDataExported(true);
+      setShowDataExport(false);
+      alert('Data exported successfully! The download should start automatically.');
+    } catch (error) {
+      console.error('Export error:', error);
+      alert(`Failed to export data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setExportingData(false);
+    }
+  };
+
+  const handleDeleteTenant = async () => {
+    if (!confirmDataExported) {
+      alert('Please confirm that data has been exported before proceeding with deletion.');
+      return;
+    }
+
+    const finalConfirm = window.confirm(
+      `FINAL CONFIRMATION: Are you absolutely sure you want to permanently delete ${tenant.company_name}?\n\nThis action CANNOT be undone. All data will be permanently removed.\n\nType the tenant name to confirm.`
+    );
+
+    if (!finalConfirm) return;
+
+    const typedName = window.prompt(`Type "${tenant.company_name}" to confirm deletion:`);
+    if (typedName !== tenant.company_name) {
+      alert('Tenant name does not match. Deletion cancelled.');
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('Not authenticated');
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-tenant`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            tenant_id: tenant.id,
+            reason: deletionReason || 'No reason provided',
+            data_exported: dataExported,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete tenant');
+      }
+
+      alert(`Tenant "${tenant.company_name}" has been successfully deleted.`);
+      onDeleted();
+      onClose();
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert(`Failed to delete tenant: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  if (showDataExport) {
+    return (
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => !exportingData && setShowDataExport(false)}>
+        <div
+          className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-lg"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-6 py-4 border-b border-zinc-800">
+            <h2 className="text-xl font-bold text-white">Export Tenant Data</h2>
+            <p className="text-sm text-gray-400 mt-1">Download all data for GDPR compliance</p>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+              <p className="text-sm text-blue-400">
+                This will export all tenant data including customers, loyalty programs, campaigns, communications, and more.
+              </p>
+            </div>
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-yellow-400">Important</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Export data before deletion to comply with GDPR data portability requirements.
+                  </p>
+                </div>
+              </div>
+            </div>
+            {exportSummary && (
+              <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4">
+                <p className="text-sm font-medium text-white mb-2">Last Export Summary:</p>
+                <div className="text-xs text-gray-400 space-y-1">
+                  <p>Businesses: {exportSummary.data_counts.businesses}</p>
+                  <p>Customers: {exportSummary.data_counts.customers}</p>
+                  <p>Loyalty Programs: {exportSummary.data_counts.loyalty_programs}</p>
+                  <p>Communications: {exportSummary.data_counts.communication_logs}</p>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="px-6 py-4 border-t border-zinc-800 flex gap-3">
+            <button
+              onClick={() => setShowDataExport(false)}
+              disabled={exportingData}
+              className="flex-1 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleExportData}
+              disabled={exportingData}
+              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {exportingData ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Exporting...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  <span>Download Data</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (showDeleteConfirm) {
+    return (
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => !deleting && setShowDeleteConfirm(false)}>
+        <div
+          className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-lg"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-6 py-4 border-b border-zinc-800">
+            <h2 className="text-xl font-bold text-red-400">Delete Tenant</h2>
+            <p className="text-sm text-gray-400 mt-1">Permanently remove {tenant.company_name}</p>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-red-400">Warning: This action is irreversible</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    All data associated with this tenant will be permanently deleted, including customers, programs, campaigns, and communications.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {!dataExported && (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                <p className="text-sm text-yellow-400">
+                  Data has not been exported. It is recommended to export data before deletion for GDPR compliance.
+                </p>
+                <button
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    setShowDataExport(true);
+                  }}
+                  className="mt-3 text-sm text-blue-400 hover:text-blue-300 underline"
+                >
+                  Export Data Now
+                </button>
+              </div>
+            )}
+
+            {dataExported && (
+              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+                <p className="text-sm text-green-400">
+                  Data has been exported successfully.
+                </p>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-2">
+                Reason for deletion (optional)
+              </label>
+              <textarea
+                value={deletionReason}
+                onChange={(e) => setDeletionReason(e.target.value)}
+                placeholder="Enter reason for audit trail..."
+                className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 resize-none"
+                rows={3}
+              />
+            </div>
+
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={confirmDataExported}
+                onChange={(e) => setConfirmDataExported(e.target.checked)}
+                className="mt-1 w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-orange-500 focus:ring-orange-500 focus:ring-offset-0"
+              />
+              <span className="text-sm text-gray-400">
+                I confirm that data has been {dataExported ? 'exported' : 'backed up or is not needed'} and I understand this deletion is permanent and cannot be undone.
+              </span>
+            </label>
+          </div>
+          <div className="px-6 py-4 border-t border-zinc-800 flex gap-3">
+            <button
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={deleting}
+              className="flex-1 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDeleteTenant}
+              disabled={deleting || !confirmDataExported}
+              className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {deleting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Deleting...</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  <span>Delete Permanently</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
@@ -377,6 +676,29 @@ function TenantDetailsModal({ tenant, onClose }: { tenant: Tenant; onClose: () =
               </p>
             </div>
           )}
+
+          <div className="border-t border-zinc-800 pt-6 space-y-3">
+            <h3 className="text-sm font-medium text-gray-400 mb-3">Tenant Management Actions</h3>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDataExport(true)}
+                className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition flex items-center justify-center gap-2"
+              >
+                <Download className="w-5 h-5" />
+                <span>Export All Data</span>
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition flex items-center justify-center gap-2"
+              >
+                <Trash2 className="w-5 h-5" />
+                <span>Delete Tenant</span>
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 text-center">
+              Export data before deletion to comply with GDPR requirements
+            </p>
+          </div>
         </div>
       </div>
     </div>
