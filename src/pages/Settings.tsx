@@ -38,7 +38,7 @@ export default function Settings() {
   const checkGoogleProviderStatus = async () => {
     setLoadingGoogleStatus(true);
     try {
-      const { data, error } = await supabase.auth.admin.listUsers();
+      const { error } = await supabase.auth.admin.listUsers();
 
       if (error) {
         console.error('Error checking Google provider status:', error);

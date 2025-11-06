@@ -33,7 +33,6 @@ import {
   Activity,
   DollarSign,
   UserPlus,
-  Calendar,
   BarChart2,
   LineChart
 } from 'lucide-react';
@@ -51,7 +50,6 @@ interface SubscriptionTier {
 export default function Landing() {
   const navigate = useNavigate();
   const [tiers, setTiers] = useState<SubscriptionTier[]>([]);
-  const [selectedTier, setSelectedTier] = useState<string>('');
 
   useEffect(() => {
     loadTiers();
@@ -65,10 +63,6 @@ export default function Landing() {
 
     if (data) {
       setTiers(data);
-      const freeTier = data.find(t => t.name === 'Free');
-      if (freeTier) {
-        setSelectedTier(freeTier.id);
-      }
     }
   };
 
@@ -945,7 +939,7 @@ export default function Landing() {
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {tiers.map((tier, index) => {
+          {tiers.map((tier) => {
             const isPopular = tier.name === 'Pro';
             const tierFeatures = tierDetails[tier.name as keyof typeof tierDetails] || [];
 

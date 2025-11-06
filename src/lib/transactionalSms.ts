@@ -1,5 +1,3 @@
-import { supabase } from './supabase';
-
 export type TransactionalTrigger = 'welcome' | 'reward_earned' | 'points_milestone' | 'birthday';
 
 export interface SendTransactionalSmsParams {

@@ -36,7 +36,6 @@ export default function UploadCustomersModal({ onClose, onSuccess }: UploadCusto
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [csvData, setCSVData] = useState<CSVRow[]>([]);
-  const [validRows, setValidRows] = useState<CSVRow[]>([]);
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [importProgress, setImportProgress] = useState(0);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
@@ -189,7 +188,6 @@ export default function UploadCustomersModal({ onClose, onSuccess }: UploadCusto
       }
     }
 
-    setValidRows(valid);
     setValidationErrors(errors);
 
     if (valid.length > 0) {

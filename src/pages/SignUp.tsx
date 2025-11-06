@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { redirectToCheckout } from '../lib/stripe';
 import { UserPlus, Check } from 'lucide-react';
 
 interface SubscriptionTier {

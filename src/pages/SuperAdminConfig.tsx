@@ -794,7 +794,7 @@ export default function SuperAdminConfig() {
                           <input
                             type="number"
                             step="0.01"
-                            value={getTierValue(tier, 'price_monthly')}
+                            value={getTierValue(tier, 'price_monthly') ?? ''}
                             onChange={(e) => handleTierChange(tier.id, 'price_monthly', e.target.value)}
                             className="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
                           />
@@ -819,7 +819,7 @@ export default function SuperAdminConfig() {
                           </label>
                           <input
                             type="number"
-                            value={getTierValue(tier, 'max_customers')}
+                            value={getTierValue(tier, 'max_customers') ?? ''}
                             onChange={(e) => handleTierChange(tier.id, 'max_customers', parseInt(e.target.value))}
                             className="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
                           />
@@ -832,7 +832,7 @@ export default function SuperAdminConfig() {
                           </label>
                           <input
                             type="number"
-                            value={getTierValue(tier, 'max_programs')}
+                            value={getTierValue(tier, 'max_programs') ?? ''}
                             onChange={(e) => handleTierChange(tier.id, 'max_programs', parseInt(e.target.value))}
                             className="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
                           />
@@ -845,7 +845,7 @@ export default function SuperAdminConfig() {
                           </label>
                           <input
                             type="number"
-                            value={getTierValue(tier, 'max_sms_monthly')}
+                            value={getTierValue(tier, 'max_sms_monthly') ?? ''}
                             onChange={(e) => handleTierChange(tier.id, 'max_sms_monthly', parseInt(e.target.value))}
                             className="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
                           />
@@ -858,7 +858,7 @@ export default function SuperAdminConfig() {
                           </label>
                           <input
                             type="number"
-                            value={getTierValue(tier, 'initial_credits')}
+                            value={getTierValue(tier, 'initial_credits') ?? ''}
                             onChange={(e) => handleTierChange(tier.id, 'initial_credits', parseInt(e.target.value))}
                             className="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
                           />
@@ -870,7 +870,7 @@ export default function SuperAdminConfig() {
                           </label>
                           <input
                             type="number"
-                            value={getTierValue(tier, 'credit_cost_sms')}
+                            value={getTierValue(tier, 'credit_cost_sms') ?? ''}
                             onChange={(e) => handleTierChange(tier.id, 'credit_cost_sms', parseInt(e.target.value))}
                             className="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
                           />
@@ -882,7 +882,7 @@ export default function SuperAdminConfig() {
                           </label>
                           <input
                             type="number"
-                            value={getTierValue(tier, 'credit_cost_email')}
+                            value={getTierValue(tier, 'credit_cost_email') ?? ''}
                             onChange={(e) => handleTierChange(tier.id, 'credit_cost_email', parseInt(e.target.value))}
                             className="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
                           />

@@ -242,27 +242,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const loadTenant = async (tenantId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('tenants')
-        .select('*')
-        .eq('id', tenantId)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error loading tenant:', error);
-        setTenant(null);
-      } else if (data) {
-        console.log('Loaded tenant data:', data);
-        setTenant(data);
-      }
-    } catch (error) {
-      console.error('Exception loading tenant:', error);
-      setTenant(null);
-    }
-  };
-
   const createBusinessForOAuthUser = async (userId: string) => {
     try {
       // First check if this user is a super admin

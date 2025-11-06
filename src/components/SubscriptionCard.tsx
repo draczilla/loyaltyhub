@@ -75,7 +75,7 @@ export default function SubscriptionCard({
         <li className="flex items-start gap-2 text-gray-300">
           <Check className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5" />
           <span>
-            {tier.features.max_seats ? `${tier.features.max_seats} team ${tier.features.max_seats === 1 ? 'seat' : 'seats'}` : '1 team seat'}
+            {tier.features.unlimited_seats ? 'Unlimited team seats' : '1 team seat'}
           </span>
         </li>
         <li className="flex items-start gap-2 text-gray-300">

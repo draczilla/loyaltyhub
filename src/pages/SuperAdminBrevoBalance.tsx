@@ -94,7 +94,7 @@ export default function SuperAdminBrevoBalance() {
       const { data, error } = await supabase.rpc('get_daily_email_allowance').maybeSingle();
       if (error) throw error;
       if (data) {
-        setDailyAllowance(data);
+        setDailyAllowance(data as DailyAllowance);
       }
     } catch (err) {
       console.error('Error loading daily allowance:', err);

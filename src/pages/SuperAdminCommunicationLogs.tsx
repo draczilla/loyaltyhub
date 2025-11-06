@@ -148,7 +148,7 @@ export default function SuperAdminCommunicationLogs() {
     }
   };
 
-  const getProviderBadge = (provider: string | null, type: string) => {
+  const getProviderBadge = (provider: string | null) => {
     if (!provider) return null;
 
     const colors: Record<string, string> = {
@@ -469,7 +469,7 @@ export default function SuperAdminCommunicationLogs() {
                             </span>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            {getProviderBadge(log.provider, log.type)}
+                            {getProviderBadge(log.provider)}
                           </td>
                         </tr>
                       ))}

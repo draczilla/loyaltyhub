@@ -34,18 +34,23 @@ export default function VerifyPhone() {
         throw error;
       }
 
-      if (data.success) {
-        setStatus('success');
-        setMessage(data.message || 'Phone verified successfully!');
-        setNextStep(data.next_step);
+      if (data && typeof data === 'object' && 'success' in data) {
+        if (data.success) {
+          setStatus('success');
+          setMessage((data as any).message || 'Phone verified successfully!');
+          setNextStep((data as any).next_step || '');
 
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 2000);
+          setTimeout(() => {
+            navigate('/dashboard');
+          }, 2000);
+        } else {
+          setStatus('error');
+          setMessage((data as any).message || 'Verification failed');
+          setNextStep((data as any).next_step || '');
+        }
       } else {
         setStatus('error');
-        setMessage(data.message || 'Verification failed');
-        setNextStep(data.next_step);
+        setMessage('Invalid response from server');
       }
     } catch (err) {
       console.error('Verification error:', err);

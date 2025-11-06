@@ -17,7 +17,7 @@ interface InvitationData {
 export default function AcceptInvitation() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user, signUp, signIn } = useAuth();
+  const { signUp, signIn } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [invitation, setInvitation] = useState<InvitationData | null>(null);
