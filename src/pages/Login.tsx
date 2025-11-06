@@ -24,11 +24,18 @@ export default function Login() {
     if (!authLoading && user) {
       if (isSuperAdmin) {
         navigate('/admin/dashboard');
-      } else {
-        navigate('/dashboard');
+      } else if (business) {
+        // Check onboarding status and redirect appropriately
+        if (business.onboarding_status === 'pending_email') {
+          navigate('/pending-verification');
+        } else if (business.onboarding_status === 'pending_phone') {
+          navigate('/verify-phone-setup');
+        } else {
+          navigate('/dashboard');
+        }
       }
     }
-  }, [isSuperAdmin, authLoading, user, navigate]);
+  }, [isSuperAdmin, authLoading, user, business, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

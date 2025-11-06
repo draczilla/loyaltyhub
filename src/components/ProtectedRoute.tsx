@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 interface ProtectedRouteProps {
@@ -6,7 +6,8 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { user, loading } = useAuth();
+  const { user, business, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -21,6 +22,29 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Allow access to verification-related routes without blocking
+  const verificationRoutes = [
+    '/pending-verification',
+    '/verify-email',
+    '/verify-phone-setup',
+    '/verify-phone',
+  ];
+
+  const isVerificationRoute = verificationRoutes.some(route =>
+    location.pathname.startsWith(route)
+  );
+
+  // Check onboarding status and redirect if needed (skip for verification routes)
+  if (business && !isVerificationRoute) {
+    if (business.onboarding_status === 'pending_email') {
+      return <Navigate to="/pending-verification" replace />;
+    }
+
+    if (business.onboarding_status === 'pending_phone') {
+      return <Navigate to="/verify-phone-setup" replace />;
+    }
   }
 
   return <>{children}</>;
