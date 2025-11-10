@@ -344,9 +344,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           usage_sms_monthly: 0,
           tenant_id: tenantToUse.id,
           is_tenant_admin: true,
-          email_verified: true,
-          phone_verified: true,
+          email_verified: false,
+          phone_verified: false,
           onboarding_status: 'completed',
+          credits_remaining: 0,
         })
         .select()
         .single();
@@ -429,15 +430,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: { message: 'Failed to create or find tenant' } as any };
     }
 
-    // Get tier information for welcome email
-    const { data: tierData } = await supabase
-      .from('subscription_tiers')
-      .select('name')
-      .eq('id', tierId)
-      .maybeSingle();
-
-    const tierName = tierData?.name || 'Free';
-
     // Create business only if it doesn't exist
     if (!existingBusiness) {
       const { error: businessError } = await supabase
@@ -454,7 +446,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           is_tenant_admin: true,
           email_verified: false,
           phone_verified: false,
-          onboarding_status: 'pending_email',
+          onboarding_status: 'completed',
+          credits_remaining: 0,
         });
 
       if (businessError) {
@@ -474,24 +467,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (memberError) {
         console.error('Error creating tenant member:', memberError);
-      }
-
-      // Send welcome verification email
-      try {
-        const { error: emailError } = await supabase.functions.invoke('send-welcome-verification', {
-          body: {
-            businessId: authData.user.id,
-            email,
-            companyName,
-            tierName,
-          },
-        });
-
-        if (emailError) {
-          console.error('Error sending welcome email:', emailError);
-        }
-      } catch (error) {
-        console.error('Exception sending welcome email:', error);
       }
     }
 

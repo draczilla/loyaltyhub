@@ -4,7 +4,8 @@ import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
 import {
   Menu, Building2, Users, Mail, AlertCircle, Check,
-  UserPlus, Trash2, RefreshCw, XCircle, Crown, User
+  UserPlus, Trash2, RefreshCw, XCircle, Crown, User,
+  CheckCircle, Shield, Smartphone, Loader
 } from 'lucide-react';
 
 interface TenantMember {
@@ -45,6 +46,11 @@ export default function CompanyProfile() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviting, setInviting] = useState(false);
+  const [sendingEmailVerification, setSendingEmailVerification] = useState(false);
+  const [sendingPhoneVerification, setSendingPhoneVerification] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [showPhoneInput, setShowPhoneInput] = useState(false);
+  const [creditsEligibility, setCreditsEligibility] = useState<any>(null);
 
   useEffect(() => {
     if (business && !tenant) {
@@ -52,6 +58,7 @@ export default function CompanyProfile() {
       createTenantForExistingUser();
     } else if (tenant && business) {
       loadTeamData();
+      loadCreditsEligibility();
     }
   }, [tenant, business]);
 
@@ -102,6 +109,104 @@ export default function CompanyProfile() {
       console.error('Error creating tenant:', err);
       setError(err instanceof Error ? err.message : 'Failed to initialize company profile');
       setLoading(false);
+    }
+  };
+
+  const loadCreditsEligibility = async () => {
+    if (!business) return;
+
+    try {
+      const { data, error } = await supabase.rpc('check_credits_eligibility', {
+        p_business_id: business.id,
+      });
+
+      if (error) throw error;
+      setCreditsEligibility(data?.[0] || null);
+    } catch (err) {
+      console.error('Error checking credits eligibility:', err);
+    }
+  };
+
+  const handleSendEmailVerification = async () => {
+    if (!business) return;
+
+    setSendingEmailVerification(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const { data: tierData } = await supabase
+        .from('subscription_tiers')
+        .select('name')
+        .eq('id', business.tier_id)
+        .maybeSingle();
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-welcome-verification`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            businessId: business.id,
+            email: business.email,
+            companyName: business.company_name,
+            tierName: tierData?.name || 'Free',
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to send verification email');
+      }
+
+      setSuccess('Verification email sent! Please check your inbox.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send verification email');
+    } finally {
+      setSendingEmailVerification(false);
+    }
+  };
+
+  const handleSendPhoneVerification = async () => {
+    if (!business || !phoneNumber) return;
+
+    setSendingPhoneVerification(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+1${phoneNumber}`;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-phone-verification`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            businessId: business.id,
+            phone: formattedPhone,
+            companyName: business.company_name,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to send verification SMS');
+      }
+
+      setSuccess('Verification SMS sent! Please check your phone.');
+      setShowPhoneInput(false);
+      setPhoneNumber('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send verification SMS');
+    } finally {
+      setSendingPhoneVerification(false);
     }
   };
 
@@ -388,6 +493,176 @@ export default function CompanyProfile() {
             </div>
           ) : (
             <div className="max-w-5xl mx-auto space-y-6">
+              {/* Verification Status Card */}
+              <div className="bg-gradient-to-br from-zinc-900 to-zinc-800 border border-zinc-700 rounded-xl p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 bg-orange-500/10 rounded-lg flex items-center justify-center">
+                    <Shield className="w-6 h-6 text-orange-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Account Verification</h2>
+                    <p className="text-sm text-gray-400">Complete verification to unlock communication features and credits</p>
+                  </div>
+                </div>
+
+                {/* Verification Progress */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  {/* Email Verification */}
+                  <div className={`p-4 rounded-lg border-2 ${
+                    business?.email_verified
+                      ? 'bg-green-500/5 border-green-500/20'
+                      : 'bg-zinc-800 border-zinc-700'
+                  }`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Mail className={`w-5 h-5 ${business?.email_verified ? 'text-green-400' : 'text-gray-400'}`} />
+                        <span className="font-medium text-white">Email Verification</span>
+                      </div>
+                      {business?.email_verified ? (
+                        <CheckCircle className="w-5 h-5 text-green-400" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-gray-500" />
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-400 mb-3">{business?.email}</p>
+                    {business?.email_verified ? (
+                      <div className="flex items-center gap-2 text-sm text-green-400">
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Verified</span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleSendEmailVerification}
+                        disabled={sendingEmailVerification}
+                        className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm transition flex items-center justify-center gap-2"
+                      >
+                        {sendingEmailVerification ? (
+                          <>
+                            <Loader className="w-4 h-4 animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          'Send Verification Email'
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Phone Verification */}
+                  <div className={`p-4 rounded-lg border-2 ${
+                    business?.phone_verified
+                      ? 'bg-green-500/5 border-green-500/20'
+                      : 'bg-zinc-800 border-zinc-700'
+                  }`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Smartphone className={`w-5 h-5 ${business?.phone_verified ? 'text-green-400' : 'text-gray-400'}`} />
+                        <span className="font-medium text-white">Phone Verification</span>
+                      </div>
+                      {business?.phone_verified ? (
+                        <CheckCircle className="w-5 h-5 text-green-400" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-gray-500" />
+                      )}
+                    </div>
+                    {business?.phone_verified ? (
+                      <>
+                        <p className="text-sm text-gray-400 mb-3">{business?.phone || 'Phone verified'}</p>
+                        <div className="flex items-center gap-2 text-sm text-green-400">
+                          <CheckCircle className="w-4 h-4" />
+                          <span>Verified</span>
+                        </div>
+                      </>
+                    ) : showPhoneInput ? (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <div className="w-16 px-2 py-2 bg-black border border-zinc-700 rounded text-white text-center text-sm">
+                            +1
+                          </div>
+                          <input
+                            type="tel"
+                            value={phoneNumber}
+                            onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+                            placeholder="5551234567"
+                            className="flex-1 px-3 py-2 bg-black border border-zinc-700 rounded text-white placeholder-gray-500 text-sm focus:outline-none focus:border-orange-500"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setShowPhoneInput(false)}
+                            className="flex-1 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded text-sm transition"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleSendPhoneVerification}
+                            disabled={sendingPhoneVerification || !phoneNumber || phoneNumber.length < 10}
+                            className="flex-1 px-3 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded text-sm transition flex items-center justify-center gap-2"
+                          >
+                            {sendingPhoneVerification ? (
+                              <>
+                                <Loader className="w-4 h-4 animate-spin" />
+                                Sending...
+                              </>
+                            ) : (
+                              'Send SMS'
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-sm text-gray-400 mb-3">Not verified</p>
+                        <button
+                          onClick={() => setShowPhoneInput(true)}
+                          className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm transition"
+                        >
+                          Verify Phone Number
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Credits Status */}
+                <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-medium text-white">Communication Credits</h3>
+                    <span className="text-2xl font-bold text-orange-400">{business?.credits_remaining || 0}</span>
+                  </div>
+                  {creditsEligibility && (
+                    <div className="space-y-2">
+                      {creditsEligibility.eligible ? (
+                        <div className="flex items-center gap-2 text-sm text-green-400">
+                          <CheckCircle className="w-4 h-4" />
+                          <span>{creditsEligibility.reason}</span>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm text-yellow-400">
+                            <AlertCircle className="w-4 h-4" />
+                            <span>{creditsEligibility.reason}</span>
+                          </div>
+                          {creditsEligibility.reason.includes('subscription') && (
+                            <button
+                              onClick={() => window.location.href = '/subscription'}
+                              className="w-full px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm transition"
+                            >
+                              View Subscription Plans
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      {business?.email_verified && business?.phone_verified && creditsEligibility.eligible && (
+                        <p className="text-xs text-gray-500">
+                          Credits will be used for SMS and email communications
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Company Information */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                 <h2 className="text-xl font-bold text-white mb-4">Company Information</h2>

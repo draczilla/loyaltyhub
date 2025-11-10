@@ -200,17 +200,21 @@ function App() {
       <Route path="/customer/dashboard" element={<CustomerDashboard />} />
 
       <Route
-        path="/company"
+        path="/company-profile"
         element={
           <ProtectedRoute>
             <CompanyProfile />
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/company"
+        element={<Navigate to="/company-profile" replace />}
+      />
       <Route path="/accept-invitation" element={<AcceptInvitation />} />
-      <Route path="/pending-verification" element={<PendingVerification />} />
+      <Route path="/pending-verification" element={<Navigate to="/company-profile" replace />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
-      <Route path="/verify-phone-setup" element={<VerifyPhoneSetup />} />
+      <Route path="/verify-phone-setup" element={<Navigate to="/company-profile" replace />} />
       <Route path="/verify-phone" element={<VerifyPhone />} />
     </Routes>
   );

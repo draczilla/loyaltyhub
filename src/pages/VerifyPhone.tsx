@@ -97,30 +97,19 @@ export default function VerifyPhone() {
                 <h1 className="text-2xl font-bold text-white mb-2">Verification Failed</h1>
                 <p className="text-gray-400 mb-6">{message}</p>
 
-                {nextStep === 'request_new' && (
-                  <button
-                    onClick={() => navigate('/verify-phone-setup')}
-                    className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium rounded-lg transition"
-                  >
-                    <Smartphone className="w-5 h-5" />
-                    Request New Verification SMS
-                  </button>
-                )}
-
-                {nextStep === 'email_verification' && (
-                  <button
-                    onClick={() => navigate('/verify-email')}
-                    className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium rounded-lg transition"
-                  >
-                    Verify Email First
-                  </button>
-                )}
+                <button
+                  onClick={() => navigate('/company-profile')}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium rounded-lg transition"
+                >
+                  <Smartphone className="w-5 h-5" />
+                  Go to Company Profile
+                </button>
 
                 <button
-                  onClick={() => navigate('/login')}
+                  onClick={() => navigate('/dashboard')}
                   className="w-full mt-3 py-3 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white font-medium rounded-lg transition"
                 >
-                  Back to Login
+                  Back to Dashboard
                 </button>
               </>
             )}

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
+import VerificationGuard from '../components/VerificationGuard';
 import { Menu, Mail, Plus, Edit2, Save, X, AlertCircle, Check } from 'lucide-react';
 
 interface EmailTemplate {
@@ -153,10 +154,11 @@ export default function EmailTemplates() {
   };
 
   return (
-    <div className="min-h-screen bg-black flex">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+    <VerificationGuard featureName="Email Templates">
+      <div className="min-h-screen bg-black flex">
+        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="flex-1 flex flex-col min-h-screen lg:ml-64">
+        <div className="flex-1 flex flex-col min-h-screen lg:ml-64">
         <header className="bg-zinc-900 border-b border-zinc-800 sticky top-0 z-10">
           <div className="px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
@@ -448,5 +450,6 @@ export default function EmailTemplates() {
         </main>
       </div>
     </div>
+    </VerificationGuard>
   );
 }

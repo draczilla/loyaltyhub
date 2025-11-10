@@ -42,7 +42,7 @@ export default function VerifyEmail() {
           setNextStep((data as any).next_step || '');
 
           setTimeout(() => {
-            navigate('/login?verified=email');
+            navigate('/company-profile?verified=email');
           }, 2000);
         } else {
           setStatus('error');
@@ -138,7 +138,7 @@ export default function VerifyEmail() {
                 <p className="text-gray-400 mb-4">{message}</p>
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mt-4">
                   <p className="text-blue-400 text-sm">
-                    Redirecting to login...
+                    Redirecting to your profile...
                   </p>
                 </div>
               </>
