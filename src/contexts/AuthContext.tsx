@@ -290,6 +290,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const companyName = user.user_metadata?.full_name || user.email.split('@')[0];
 
+      // Check if business already exists
+      const { data: existingBusiness } = await supabase
+        .from('businesses')
+        .select('*, tenants(*)')
+        .eq('id', userId)
+        .maybeSingle();
+
+      // If business already exists, just set the state and return
+      if (existingBusiness) {
+        console.log('Business already exists for OAuth user:', existingBusiness);
+        setBusiness(existingBusiness);
+        setTenant(existingBusiness.tenants || null);
+        setIsSuperAdmin(false);
+        setIsTenantAdmin(existingBusiness.is_tenant_admin || false);
+        return;
+      }
+
       // Check if tenant already exists for this user
       const { data: existingTenant } = await supabase
         .from('tenants')
