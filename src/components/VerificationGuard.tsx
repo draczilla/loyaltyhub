@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Shield, Mail, Smartphone, AlertCircle } from 'lucide-react';
+import { Shield, Mail, Smartphone, AlertCircle, Loader2 } from 'lucide-react';
 
 interface VerificationGuardProps {
   children: ReactNode;
@@ -9,11 +9,44 @@ interface VerificationGuardProps {
 }
 
 export default function VerificationGuard({ children, featureName = 'this feature' }: VerificationGuardProps) {
-  const { business } = useAuth();
+  const { business, loading } = useAuth();
   const navigate = useNavigate();
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-orange-500 animate-spin mx-auto mb-4" />
+          <p className="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!business) {
-    return null;
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center p-4">
+        <div className="w-full max-w-2xl">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-red-500/10 rounded-xl mb-4">
+                <AlertCircle className="w-8 h-8 text-red-400" />
+              </div>
+              <h1 className="text-3xl font-bold text-white mb-2">Access Error</h1>
+              <p className="text-gray-400 mb-6">
+                Unable to load business data. Please try logging out and back in.
+              </p>
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium rounded-lg transition"
+              >
+                Return to Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const isVerified = business.email_verified && business.phone_verified;

@@ -39,16 +39,26 @@ export default function SmsTemplates() {
     if (!business) return;
 
     setLoading(true);
-    const { data, error } = await supabase
-      .from('sms_templates')
-      .select('*')
-      .eq('business_id', business.id)
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('sms_templates')
+        .select('*')
+        .eq('business_id', business.id)
+        .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      setTemplates(data);
+      if (error) {
+        console.error('Error loading SMS templates:', error);
+        throw error;
+      }
+
+      if (data) {
+        setTemplates(data);
+      }
+    } catch (error) {
+      console.error('Failed to load SMS templates:', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleEdit = (template: SmsTemplate) => {

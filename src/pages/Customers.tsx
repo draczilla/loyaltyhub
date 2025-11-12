@@ -65,17 +65,27 @@ export default function Customers() {
     if (!business) return;
 
     setLoading(true);
-    const { data, error } = await supabase
-      .from('customers')
-      .select('*')
-      .eq('business_id', business.id)
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('business_id', business.id)
+        .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      setCustomers(data);
-      setFilteredCustomers(data);
+      if (error) {
+        console.error('Error loading customers:', error);
+        throw error;
+      }
+
+      if (data) {
+        setCustomers(data);
+        setFilteredCustomers(data);
+      }
+    } catch (error) {
+      console.error('Failed to load customers:', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleCustomerAdded = () => {

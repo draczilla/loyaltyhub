@@ -37,16 +37,26 @@ export default function Campaigns() {
     if (!business) return;
 
     setLoading(true);
-    const { data, error } = await supabase
-      .from('campaigns')
-      .select('*')
-      .eq('business_id', business.id)
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('campaigns')
+        .select('*')
+        .eq('business_id', business.id)
+        .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      setCampaigns(data);
+      if (error) {
+        console.error('Error loading campaigns:', error);
+        throw error;
+      }
+
+      if (data) {
+        setCampaigns(data);
+      }
+    } catch (error) {
+      console.error('Failed to load campaigns:', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const filteredCampaigns = campaigns.filter((campaign) => {

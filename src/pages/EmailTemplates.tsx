@@ -41,16 +41,26 @@ export default function EmailTemplates() {
     if (!business) return;
 
     setLoading(true);
-    const { data, error } = await supabase
-      .from('email_templates')
-      .select('*')
-      .eq('business_id', business.id)
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('email_templates')
+        .select('*')
+        .eq('business_id', business.id)
+        .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      setTemplates(data);
+      if (error) {
+        console.error('Error loading email templates:', error);
+        throw error;
+      }
+
+      if (data) {
+        setTemplates(data);
+      }
+    } catch (error) {
+      console.error('Failed to load email templates:', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleEdit = (template: EmailTemplate) => {
