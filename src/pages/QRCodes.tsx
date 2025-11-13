@@ -36,16 +36,26 @@ export default function QRCodes() {
     if (!business) return;
 
     setLoading(true);
-    const { data, error } = await supabase
-      .from('qr_codes')
-      .select('*')
-      .eq('business_id', business.id)
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('qr_codes')
+        .select('*')
+        .eq('business_id', business.id)
+        .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      setQrCodes(data);
+      if (error) {
+        console.error('Error loading QR codes:', error);
+        throw error;
+      }
+
+      if (data) {
+        setQrCodes(data);
+      }
+    } catch (error) {
+      console.error('Failed to load QR codes:', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const generateQRCode = async () => {

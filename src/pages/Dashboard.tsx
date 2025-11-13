@@ -58,49 +58,67 @@ export default function Dashboard() {
   const loadDashboardStats = async () => {
     if (!business) return;
 
-    const [customersResult, programsResult, transactionsResult, emailsResult] = await Promise.all([
-      supabase
-        .from('customers')
-        .select('id, created_at', { count: 'exact' })
-        .eq('business_id', business.id),
-      supabase
-        .from('loyalty_programs')
-        .select('id', { count: 'exact' })
-        .eq('business_id', business.id)
-        .eq('status', 'active'),
-      supabase
-        .from('transactions')
-        .select('id', { count: 'exact' })
-        .eq('business_id', business.id),
-      supabase
-        .from('communication_logs')
-        .select('id, opened_at', { count: 'exact' })
-        .eq('business_id', business.id)
-        .eq('type', 'email')
-        .eq('status', 'sent'),
-    ]);
+    try {
+      const [customersResult, programsResult, transactionsResult, emailsResult] = await Promise.all([
+        supabase
+          .from('customers')
+          .select('id, created_at', { count: 'exact' })
+          .eq('business_id', business.id),
+        supabase
+          .from('loyalty_programs')
+          .select('id', { count: 'exact' })
+          .eq('business_id', business.id)
+          .eq('status', 'active'),
+        supabase
+          .from('transactions')
+          .select('id', { count: 'exact' })
+          .eq('business_id', business.id),
+        supabase
+          .from('communication_logs')
+          .select('id, opened_at', { count: 'exact' })
+          .eq('business_id', business.id)
+          .eq('type', 'email')
+          .eq('status', 'sent'),
+      ]);
 
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const newCustomersThisMonth = customersResult.data?.filter(
-      c => new Date(c.created_at) >= startOfMonth
-    ).length || 0;
+      // Check for errors
+      if (customersResult.error) {
+        console.error('Error loading customers:', customersResult.error);
+      }
+      if (programsResult.error) {
+        console.error('Error loading programs:', programsResult.error);
+      }
+      if (transactionsResult.error) {
+        console.error('Error loading transactions:', transactionsResult.error);
+      }
+      if (emailsResult.error) {
+        console.error('Error loading emails:', emailsResult.error);
+      }
 
-    const totalEmails = emailsResult.count || 0;
-    const openedEmails = emailsResult.data?.filter(e => e.opened_at !== null).length || 0;
-    const emailOpenRate = totalEmails > 0 ? Math.round((openedEmails / totalEmails) * 100) : 0;
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const newCustomersThisMonth = customersResult.data?.filter(
+        c => new Date(c.created_at) >= startOfMonth
+      ).length || 0;
 
-    setStats({
-      totalCustomers: customersResult.count || 0,
+      const totalEmails = emailsResult.count || 0;
+      const openedEmails = emailsResult.data?.filter(e => e.opened_at !== null).length || 0;
+      const emailOpenRate = totalEmails > 0 ? Math.round((openedEmails / totalEmails) * 100) : 0;
+
+      setStats({
+        totalCustomers: customersResult.count || 0,
       activePrograms: programsResult.count || 0,
       totalTransactions: transactionsResult.count || 0,
       newCustomersThisMonth,
       emailsSent: totalEmails,
-      emailOpenRate,
-    });
+        emailOpenRate,
+      });
 
-    const growthData = calculateCustomerGrowth(customersResult.data || []);
-    setCustomerGrowth(growthData);
+      const growthData = calculateCustomerGrowth(customersResult.data || []);
+      setCustomerGrowth(growthData);
+    } catch (error) {
+      console.error('Failed to load dashboard stats:', error);
+    }
   };
 
   const calculateCustomerGrowth = (customers: Array<{ created_at: string }>) => {
