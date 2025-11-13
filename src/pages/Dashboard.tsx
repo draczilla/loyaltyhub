@@ -18,6 +18,8 @@ interface DashboardStats {
 interface CustomerGrowthData {
   month: string;
   customers: number;
+  growth: number;
+  growthPercentage: number;
 }
 
 export default function Dashboard() {
@@ -133,9 +135,17 @@ export default function Dashboard() {
         c => new Date(c.created_at) <= monthEnd
       ).length;
 
+      const previousMonthCustomers = monthsData.length > 0 ? monthsData[monthsData.length - 1].customers : 0;
+      const growth = customersUpToMonth - previousMonthCustomers;
+      const growthPercentage = previousMonthCustomers > 0
+        ? Math.round((growth / previousMonthCustomers) * 100)
+        : customersUpToMonth > 0 ? 100 : 0;
+
       monthsData.push({
         month: date.toLocaleDateString('en-US', { month: 'short' }),
         customers: customersUpToMonth,
+        growth,
+        growthPercentage,
       });
     }
 
@@ -352,13 +362,29 @@ export default function Dashboard() {
                   const maxCustomers = Math.max(...customerGrowth.map(d => d.customers), 10);
                   const heightPercentage = maxCustomers > 0 ? (data.customers / maxCustomers) * 100 : 0;
                   const isLatest = index === customerGrowth.length - 1;
+                  const showGrowth = index > 0 && data.growth !== 0;
+                  const isPositiveGrowth = data.growth > 0;
 
                   return (
                     <div key={data.month} className="flex-1 flex flex-col items-center justify-end h-full group">
                       <div className="relative w-full flex flex-col items-center justify-end h-full mb-2">
-                        <div className="absolute -top-8 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800 border border-zinc-700 px-3 py-1 rounded-lg">
-                          <span className="text-white font-bold text-sm">{data.customers}</span>
+                        <div className="absolute -top-12 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800 border border-zinc-700 px-3 py-2 rounded-lg z-10 whitespace-nowrap">
+                          <div className="text-white font-bold text-sm">{data.customers} customers</div>
+                          {showGrowth && (
+                            <div className={`text-xs mt-1 ${isPositiveGrowth ? 'text-green-400' : 'text-red-400'}`}>
+                              {isPositiveGrowth ? '+' : ''}{data.growth} ({isPositiveGrowth ? '+' : ''}{data.growthPercentage}%)
+                            </div>
+                          )}
                         </div>
+
+                        {showGrowth && (
+                          <div className={`absolute -top-6 text-xs font-medium ${
+                            isPositiveGrowth ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {isPositiveGrowth ? '+' : ''}{data.growth}
+                          </div>
+                        )}
+
                         <div
                           className={`w-full rounded-t-lg transition-all duration-500 ease-out ${
                             isLatest
