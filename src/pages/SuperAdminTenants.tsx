@@ -5,19 +5,22 @@ import { supabase } from '../lib/supabase';
 
 interface Tenant {
   id: string;
-  email: string;
   company_name: string;
-  phone: string | null;
-  subscription_status: string;
-  credits_remaining: number;
-  stripe_price_id: string | null;
-  subscription_period_end: string | null;
+  logo_url: string | null;
+  primary_color: string;
+  admin_user_id: string;
+  admin_email: string;
+  admin_phone: string | null;
   created_at: string;
+  updated_at: string;
+  business_count: number;
+  member_count: number;
+  total_customers: number;
+  total_sms_sent: number;
+  subscription_status: string;
   tier_name: string;
   price_monthly: string;
-  usage_customers: number;
-  usage_sms_monthly: number;
-  tenant_id: string;
+  credits_remaining: number;
 }
 
 export default function SuperAdminTenants() {
@@ -40,54 +43,98 @@ export default function SuperAdminTenants() {
 
   const loadTenants = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('businesses')
-      .select(`
-        id,
-        email,
-        company_name,
-        phone,
-        subscription_status,
-        credits_remaining,
-        stripe_price_id,
-        subscription_period_end,
-        created_at,
-        usage_customers,
-        usage_sms_monthly,
-        tier_id,
-        tenant_id,
-        subscription_tiers (
-          name,
-          price_monthly
-        )
-      `)
-      .eq('is_super_admin', false)
-      .not('tenant_id', 'is', null)
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('tenants')
+        .select(`
+          id,
+          company_name,
+          logo_url,
+          primary_color,
+          admin_user_id,
+          created_at,
+          updated_at
+        `)
+        .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      const formattedTenants = data.map((t: any) => ({
-        id: t.id,
-        email: t.email,
-        company_name: t.company_name,
-        phone: t.phone,
-        subscription_status: t.subscription_status,
-        credits_remaining: t.credits_remaining,
-        stripe_price_id: t.stripe_price_id,
-        subscription_period_end: t.subscription_period_end,
-        created_at: t.created_at,
-        tier_name: t.subscription_tiers?.name || 'Unknown',
-        price_monthly: t.subscription_tiers?.price_monthly || '0',
-        usage_customers: t.usage_customers,
-        usage_sms_monthly: t.usage_sms_monthly,
-        tenant_id: t.tenant_id,
-      }));
+      if (error) {
+        console.error('Error loading tenants:', error);
+        setLoading(false);
+        return;
+      }
 
-      setTenants(formattedTenants);
-      setFilteredTenants(formattedTenants);
+      if (!data || data.length === 0) {
+        setTenants([]);
+        setFilteredTenants([]);
+        setLoading(false);
+        return;
+      }
+
+      const enrichedTenants = await Promise.all(
+        data.map(async (tenant: any) => {
+          const { data: businesses } = await supabase
+            .from('businesses')
+            .select(`
+              id,
+              email,
+              phone,
+              subscription_status,
+              credits_remaining,
+              usage_customers,
+              usage_sms_monthly,
+              tier_id,
+              subscription_tiers (
+                name,
+                price_monthly
+              )
+            `)
+            .eq('tenant_id', tenant.id)
+            .maybeSingle();
+
+          const { data: members } = await supabase
+            .from('tenant_members')
+            .select('id')
+            .eq('tenant_id', tenant.id)
+            .eq('status', 'active');
+
+          const { data: allBusinesses } = await supabase
+            .from('businesses')
+            .select('id, usage_customers, usage_sms_monthly')
+            .eq('tenant_id', tenant.id);
+
+          const businessCount = allBusinesses?.length || 0;
+          const totalCustomers = allBusinesses?.reduce((sum, b) => sum + (b.usage_customers || 0), 0) || 0;
+          const totalSmsSent = allBusinesses?.reduce((sum, b) => sum + (b.usage_sms_monthly || 0), 0) || 0;
+
+          return {
+            id: tenant.id,
+            company_name: tenant.company_name,
+            logo_url: tenant.logo_url,
+            primary_color: tenant.primary_color,
+            admin_user_id: tenant.admin_user_id,
+            admin_email: businesses?.email || 'N/A',
+            admin_phone: businesses?.phone || null,
+            created_at: tenant.created_at,
+            updated_at: tenant.updated_at,
+            business_count: businessCount,
+            member_count: members?.length || 0,
+            total_customers: totalCustomers,
+            total_sms_sent: totalSmsSent,
+            subscription_status: businesses?.subscription_status || 'trial',
+            tier_name: businesses?.subscription_tiers?.name || 'Free',
+            price_monthly: businesses?.subscription_tiers?.price_monthly || '0',
+            credits_remaining: businesses?.credits_remaining || 0,
+          };
+        })
+      );
+
+      setTenants(enrichedTenants);
+      setFilteredTenants(enrichedTenants);
+    } catch (err) {
+      console.error('Unexpected error loading tenants:', err);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const filterTenants = () => {
@@ -97,8 +144,8 @@ export default function SuperAdminTenants() {
       filtered = filtered.filter(
         (t) =>
           t.company_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          t.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (t.phone && t.phone.toLowerCase().includes(searchQuery.toLowerCase()))
+          t.admin_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (t.admin_phone && t.admin_phone.toLowerCase().includes(searchQuery.toLowerCase()))
       );
     }
 
@@ -145,7 +192,7 @@ export default function SuperAdminTenants() {
               </button>
               <div>
                 <h1 className="text-2xl font-bold text-white">Tenant Management</h1>
-                <p className="text-gray-400 text-sm mt-1">View and manage all business accounts</p>
+                <p className="text-gray-400 text-sm mt-1">View and manage all tenant organizations</p>
               </div>
             </div>
           </div>
@@ -164,7 +211,7 @@ export default function SuperAdminTenants() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search by company name, email, or phone..."
+                placeholder="Search by tenant name, admin email, or phone..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
@@ -193,10 +240,13 @@ export default function SuperAdminTenants() {
                   <thead className="bg-black/50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                        Company
+                        Tenant
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                        Contact
+                        Admin Contact
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        Businesses
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                         Tier
@@ -205,10 +255,7 @@ export default function SuperAdminTenants() {
                         Status
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                        Credits
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                        Usage
+                        Total Usage
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                         Created
@@ -223,18 +270,23 @@ export default function SuperAdminTenants() {
                       <tr key={tenant.id} className="hover:bg-zinc-800/50 transition">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-white">{tenant.company_name}</div>
+                          <div className="text-xs text-gray-500">{tenant.member_count} member{tenant.member_count !== 1 ? 's' : ''}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-400 flex items-center gap-1">
                             <Mail className="w-3 h-3" />
-                            {tenant.email}
+                            {tenant.admin_email}
                           </div>
-                          {tenant.phone && (
+                          {tenant.admin_phone && (
                             <div className="text-sm text-gray-400 flex items-center gap-1 mt-1">
                               <Phone className="w-3 h-3" />
-                              {tenant.phone}
+                              {tenant.admin_phone}
                             </div>
                           )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-white">{tenant.business_count}</div>
+                          <div className="text-xs text-gray-500">business{tenant.business_count !== 1 ? 'es' : ''}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-white">{tenant.tier_name}</div>
@@ -250,13 +302,10 @@ export default function SuperAdminTenants() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-400">{tenant.credits_remaining}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-400">
-                            {tenant.usage_customers} customers
+                            {tenant.total_customers} customers
                           </div>
-                          <div className="text-xs text-gray-500">{tenant.usage_sms_monthly} SMS</div>
+                          <div className="text-xs text-gray-500">{tenant.total_sms_sent} SMS</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-400">{formatDate(tenant.created_at)}</div>
@@ -313,17 +362,28 @@ function TenantDetailsModal({ tenant, onClose, onDeleted, onUpdated }: { tenant:
   const [deleting, setDeleting] = useState(false);
   const [exportSummary, setExportSummary] = useState<any>(null);
   const [editingPhone, setEditingPhone] = useState(false);
-  const [phoneValue, setPhoneValue] = useState(tenant.phone || '');
+  const [phoneValue, setPhoneValue] = useState(tenant.admin_phone || '');
   const [savingPhone, setSavingPhone] = useState(false);
   const [syncingToBrevo, setSyncingToBrevo] = useState(false);
 
   const handleUpdatePhone = async () => {
     setSavingPhone(true);
     try {
+      const { data: business } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('tenant_id', tenant.id)
+        .eq('id', tenant.admin_user_id)
+        .maybeSingle();
+
+      if (!business) {
+        throw new Error('Admin business not found');
+      }
+
       const { error } = await supabase
         .from('businesses')
         .update({ phone: phoneValue || null })
-        .eq('id', tenant.id);
+        .eq('id', business.id);
 
       if (error) throw error;
 
@@ -339,7 +399,7 @@ function TenantDetailsModal({ tenant, onClose, onDeleted, onUpdated }: { tenant:
   };
 
   const handleSyncToBrevo = async () => {
-    if (!tenant.phone) {
+    if (!phoneValue) {
       alert('Please add a phone number before syncing to Brevo');
       return;
     }
@@ -352,6 +412,17 @@ function TenantDetailsModal({ tenant, onClose, onDeleted, onUpdated }: { tenant:
         return;
       }
 
+      const { data: business } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('tenant_id', tenant.id)
+        .eq('id', tenant.admin_user_id)
+        .maybeSingle();
+
+      if (!business) {
+        throw new Error('Admin business not found');
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-business-to-brevo`,
         {
@@ -361,7 +432,7 @@ function TenantDetailsModal({ tenant, onClose, onDeleted, onUpdated }: { tenant:
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            businessId: tenant.id,
+            businessId: business.id,
           }),
         }
       );
@@ -398,7 +469,7 @@ function TenantDetailsModal({ tenant, onClose, onDeleted, onUpdated }: { tenant:
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ tenant_id: tenant.tenant_id }),
+          body: JSON.stringify({ tenant_id: tenant.id }),
         }
       );
 
@@ -468,7 +539,7 @@ function TenantDetailsModal({ tenant, onClose, onDeleted, onUpdated }: { tenant:
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            tenant_id: tenant.tenant_id,
+            tenant_id: tenant.id,
             reason: deletionReason || 'No reason provided',
             data_exported: dataExported,
           }),
@@ -688,18 +759,18 @@ function TenantDetailsModal({ tenant, onClose, onDeleted, onUpdated }: { tenant:
             <div className="space-y-4">
               <div>
                 <div className="flex items-center gap-2 text-sm text-gray-400 mb-2">
-                  <Mail className="w-4 h-4" />
-                  <span>Email</span>
+                  <Building className="w-4 h-4" />
+                  <span>Tenant Name</span>
                 </div>
-                <p className="text-white">{tenant.email}</p>
+                <p className="text-white">{tenant.company_name}</p>
               </div>
 
               <div>
                 <div className="flex items-center gap-2 text-sm text-gray-400 mb-2">
-                  <Building className="w-4 h-4" />
-                  <span>Company</span>
+                  <Mail className="w-4 h-4" />
+                  <span>Admin Email</span>
                 </div>
-                <p className="text-white">{tenant.company_name}</p>
+                <p className="text-white">{tenant.admin_email}</p>
               </div>
 
               <div>
@@ -736,7 +807,7 @@ function TenantDetailsModal({ tenant, onClose, onDeleted, onUpdated }: { tenant:
                     <button
                       onClick={() => {
                         setEditingPhone(false);
-                        setPhoneValue(tenant.phone || '');
+                        setPhoneValue(tenant.admin_phone || '');
                       }}
                       disabled={savingPhone}
                       className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition disabled:opacity-50 text-sm"
@@ -746,8 +817,8 @@ function TenantDetailsModal({ tenant, onClose, onDeleted, onUpdated }: { tenant:
                   </div>
                 ) : (
                   <>
-                    <p className="text-white">{tenant.phone || 'Not set'}</p>
-                    {tenant.phone && (
+                    <p className="text-white">{tenant.admin_phone || 'Not set'}</p>
+                    {tenant.admin_phone && (
                       <button
                         onClick={handleSyncToBrevo}
                         disabled={syncingToBrevo}
@@ -758,6 +829,14 @@ function TenantDetailsModal({ tenant, onClose, onDeleted, onUpdated }: { tenant:
                     )}
                   </>
                 )}
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 text-sm text-gray-400 mb-2">
+                  <Building className="w-4 h-4" />
+                  <span>Businesses</span>
+                </div>
+                <p className="text-white">{tenant.business_count} business{tenant.business_count !== 1 ? 'es' : ''}</p>
               </div>
 
               <div>
@@ -799,11 +878,6 @@ function TenantDetailsModal({ tenant, onClose, onDeleted, onUpdated }: { tenant:
                 >
                   {tenant.subscription_status}
                 </span>
-                {tenant.subscription_period_end && (
-                  <p className="text-xs text-gray-500 mt-2">
-                    Renews: {new Date(tenant.subscription_period_end).toLocaleDateString()}
-                  </p>
-                )}
               </div>
 
               <div className="bg-black/50 border border-zinc-800 rounded-lg p-4">
@@ -812,29 +886,24 @@ function TenantDetailsModal({ tenant, onClose, onDeleted, onUpdated }: { tenant:
               </div>
 
               <div className="bg-black/50 border border-zinc-800 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-gray-400 mb-3">Usage</h3>
+                <h3 className="text-sm font-medium text-gray-400 mb-3">Total Usage Across All Businesses</h3>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">Customers</span>
-                    <span className="text-white font-medium">{tenant.usage_customers}</span>
+                    <span className="text-gray-400">Total Customers</span>
+                    <span className="text-white font-medium">{tenant.total_customers}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">SMS Sent</span>
-                    <span className="text-white font-medium">{tenant.usage_sms_monthly}</span>
+                    <span className="text-gray-400">Total SMS Sent</span>
+                    <span className="text-white font-medium">{tenant.total_sms_sent}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Team Members</span>
+                    <span className="text-white font-medium">{tenant.member_count}</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-
-          {tenant.stripe_price_id && (
-            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-              <h3 className="text-sm font-medium text-blue-400 mb-2">Stripe Integration</h3>
-              <p className="text-sm text-gray-400">
-                <span className="font-medium">Price ID:</span> {tenant.stripe_price_id}
-              </p>
-            </div>
-          )}
 
           <div className="border-t border-zinc-800 pt-6 space-y-3">
             <h3 className="text-sm font-medium text-gray-400 mb-3">Tenant Management Actions</h3>

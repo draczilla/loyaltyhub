@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Menu, DollarSign, Users, CreditCard, TrendingUp, AlertCircle, Mail, MessageSquare, ExternalLink } from 'lucide-react';
+import { Menu, DollarSign, Users, CreditCard, TrendingUp, AlertCircle, Mail, MessageSquare, ExternalLink, Shield } from 'lucide-react';
 import SuperAdminSidebar from '../components/SuperAdminSidebar';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -23,6 +23,12 @@ interface Tenant {
   price_monthly: string;
 }
 
+interface SuperAdmin {
+  id: string;
+  email: string;
+  created_at: string;
+}
+
 export default function SuperAdminDashboard() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -33,6 +39,7 @@ export default function SuperAdminDashboard() {
     totalRevenue: 0,
   });
   const [recentTenants, setRecentTenants] = useState<Tenant[]>([]);
+  const [superAdmins, setSuperAdmins] = useState<SuperAdmin[]>([]);
   const [loading, setLoading] = useState(true);
   const [brevoBalance, setBrevoBalance] = useState<any>(null);
   const [dailyAllowance, setDailyAllowance] = useState<any>(null);
@@ -41,7 +48,39 @@ export default function SuperAdminDashboard() {
     loadDashboardData();
     loadBrevoBalance();
     loadDailyAllowance();
+    loadSuperAdmins();
   }, []);
+
+  const loadSuperAdmins = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('super_admins')
+        .select('id')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading super admins:', error);
+        return;
+      }
+
+      if (!data) return;
+
+      const enrichedAdmins = await Promise.all(
+        data.map(async (admin: any) => {
+          const { data: authData } = await supabase.auth.admin.getUserById(admin.id);
+          return {
+            id: admin.id,
+            email: authData?.user?.email || 'Unknown',
+            created_at: authData?.user?.created_at || new Date().toISOString(),
+          };
+        })
+      );
+
+      setSuperAdmins(enrichedAdmins);
+    } catch (err) {
+      console.error('Unexpected error loading super admins:', err);
+    }
+  };
 
   const loadBrevoBalance = async () => {
     const { data } = await supabase
@@ -71,58 +110,82 @@ export default function SuperAdminDashboard() {
   const loadDashboardData = async () => {
     setLoading(true);
 
-    const { data: tenants, error } = await supabase
-      .from('businesses')
-      .select(`
-        id,
-        email,
-        company_name,
-        subscription_status,
-        credits_remaining,
-        stripe_price_id,
-        subscription_period_end,
-        tier_id,
-        subscription_tiers (
-          name,
-          price_monthly
-        )
-      `)
-      .order('created_at', { ascending: false });
+    try {
+      const { data: tenantsData, error: tenantsError } = await supabase
+        .from('tenants')
+        .select('id, company_name, created_at')
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error loading dashboard data:', error);
-      setLoading(false);
-      return;
-    }
+      if (tenantsError) {
+        console.error('Error loading tenants:', tenantsError);
+        setLoading(false);
+        return;
+      }
 
-    if (tenants) {
-      const formattedTenants = tenants.map((t: any) => ({
-        id: t.id,
-        email: t.email,
-        company_name: t.company_name,
-        subscription_status: t.subscription_status,
-        credits_remaining: t.credits_remaining,
-        stripe_price_id: t.stripe_price_id,
-        subscription_period_end: t.subscription_period_end,
-        tier_name: t.subscription_tiers?.name || 'Unknown',
-        price_monthly: t.subscription_tiers?.price_monthly || '0',
-      }));
+      if (!tenantsData) {
+        setLoading(false);
+        return;
+      }
 
-      setRecentTenants(formattedTenants.slice(0, 5));
+      const enrichedTenants = await Promise.all(
+        tenantsData.slice(0, 5).map(async (tenant: any) => {
+          const { data: business } = await supabase
+            .from('businesses')
+            .select(`
+              email,
+              subscription_status,
+              credits_remaining,
+              subscription_tiers (
+                name,
+                price_monthly
+              )
+            `)
+            .eq('tenant_id', tenant.id)
+            .maybeSingle();
 
-      const totalRevenue = formattedTenants
-        .filter((t: Tenant) => t.subscription_status === 'active')
-        .reduce((sum: number, t: Tenant) => sum + parseFloat(t.price_monthly), 0);
+          return {
+            id: tenant.id,
+            email: business?.email || 'N/A',
+            company_name: tenant.company_name,
+            subscription_status: business?.subscription_status || 'trial',
+            credits_remaining: business?.credits_remaining || 0,
+            stripe_price_id: null,
+            subscription_period_end: null,
+            tier_name: business?.subscription_tiers?.name || 'Free',
+            price_monthly: business?.subscription_tiers?.price_monthly || '0',
+          };
+        })
+      );
+
+      setRecentTenants(enrichedTenants);
+
+      const { data: allBusinesses } = await supabase
+        .from('businesses')
+        .select(`
+          subscription_status,
+          subscription_tiers (
+            price_monthly
+          )
+        `)
+        .not('tenant_id', 'is', null);
+
+      const activeTenantCount = allBusinesses?.filter((b: any) => b.subscription_status === 'active').length || 0;
+      const trialTenantCount = allBusinesses?.filter((b: any) => b.subscription_status === 'trial').length || 0;
+      const totalRevenue = allBusinesses
+        ?.filter((b: any) => b.subscription_status === 'active')
+        .reduce((sum: number, b: any) => sum + parseFloat(b.subscription_tiers?.price_monthly || '0'), 0) || 0;
 
       setStats({
-        totalTenants: tenants.length,
-        activeTenants: tenants.filter((t: any) => t.subscription_status === 'active').length,
-        trialTenants: tenants.filter((t: any) => t.subscription_status === 'trial').length,
+        totalTenants: tenantsData.length,
+        activeTenants: activeTenantCount,
+        trialTenants: trialTenantCount,
         totalRevenue,
       });
+    } catch (err) {
+      console.error('Unexpected error loading dashboard data:', err);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const getStatusColor = (status: string) => {
@@ -373,6 +436,69 @@ export default function SuperAdminDashboard() {
                       <span className="text-white font-medium">{stats.totalTenants}</span>
                     </div>
                   </div>
+                </div>
+              </div>
+
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                <div className="px-6 py-4 border-b border-zinc-800">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-red-500/10 rounded-lg">
+                      <Shield className="w-5 h-5 text-red-400" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-white">Platform Super Admins</h2>
+                      <p className="text-sm text-gray-400 mt-1">System administrators with full access</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-black/50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                          Email
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                          User ID
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                          Created
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800">
+                      {superAdmins.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} className="px-6 py-8 text-center text-gray-400">
+                            No super admins found
+                          </td>
+                        </tr>
+                      ) : (
+                        superAdmins.map((admin) => (
+                          <tr key={admin.id} className="hover:bg-zinc-800/50 transition">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-white flex items-center gap-2">
+                                <Shield className="w-4 h-4 text-red-400" />
+                                {admin.email}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-xs text-gray-400 font-mono">{admin.id}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-400">
+                                {new Date(admin.created_at).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                })}
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
