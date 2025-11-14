@@ -1,7 +1,7 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Shield, Mail, Smartphone, AlertCircle, Loader2 } from 'lucide-react';
+import { Shield, Mail, Smartphone, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 
 interface VerificationGuardProps {
   children: ReactNode;
@@ -9,8 +9,9 @@ interface VerificationGuardProps {
 }
 
 export default function VerificationGuard({ children, featureName = 'this feature' }: VerificationGuardProps) {
-  const { business, loading } = useAuth();
+  const { business, loading, user } = useAuth();
   const navigate = useNavigate();
+  const [retrying, setRetrying] = useState(false);
 
   if (loading) {
     return (
@@ -23,7 +24,14 @@ export default function VerificationGuard({ children, featureName = 'this featur
     );
   }
 
-  if (!business) {
+  const handleRetry = async () => {
+    setRetrying(true);
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
+  };
+
+  if (!business && user) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4">
         <div className="w-full max-w-2xl">
@@ -32,16 +40,38 @@ export default function VerificationGuard({ children, featureName = 'this featur
               <div className="inline-flex items-center justify-center w-16 h-16 bg-red-500/10 rounded-xl mb-4">
                 <AlertCircle className="w-8 h-8 text-red-400" />
               </div>
-              <h1 className="text-3xl font-bold text-white mb-2">Access Error</h1>
-              <p className="text-gray-400 mb-6">
-                Unable to load business data. Please try logging out and back in.
+              <h1 className="text-3xl font-bold text-white mb-2">Business Data Not Loaded</h1>
+              <p className="text-gray-400 mb-2">
+                Unable to load your business information. This may happen if you just signed up.
               </p>
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium rounded-lg transition"
-              >
-                Return to Dashboard
-              </button>
+              <p className="text-sm text-gray-500 mb-6">
+                Try refreshing the page. If the problem persists, please sign out and sign back in.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={handleRetry}
+                  disabled={retrying}
+                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium rounded-lg transition disabled:opacity-50"
+                >
+                  {retrying ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Refreshing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-5 h-5" />
+                      Refresh Page
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => navigate('/dashboard')}
+                  className="px-6 py-3 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white font-medium rounded-lg transition"
+                >
+                  Back to Dashboard
+                </button>
+              </div>
             </div>
           </div>
         </div>

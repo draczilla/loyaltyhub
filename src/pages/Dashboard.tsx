@@ -41,6 +41,7 @@ export default function Dashboard() {
   const [customerGrowth, setCustomerGrowth] = useState<CustomerGrowthData[]>([]);
 
   useEffect(() => {
+    console.log('[Dashboard] Business context updated:', business?.id);
     if (business) {
       loadDashboardStats();
     }
@@ -58,8 +59,12 @@ export default function Dashboard() {
   }, [business, searchParams, setSearchParams]);
 
   const loadDashboardStats = async () => {
-    if (!business) return;
+    if (!business) {
+      console.log('[Dashboard] Cannot load stats: business is null');
+      return;
+    }
 
+    console.log('[Dashboard] Loading stats for business:', business.id);
     try {
       const [customersResult, programsResult, transactionsResult, emailsResult] = await Promise.all([
         supabase
@@ -85,16 +90,16 @@ export default function Dashboard() {
 
       // Check for errors
       if (customersResult.error) {
-        console.error('Error loading customers:', customersResult.error);
+        console.error('[Dashboard] Error loading customers:', customersResult.error);
       }
       if (programsResult.error) {
-        console.error('Error loading programs:', programsResult.error);
+        console.error('[Dashboard] Error loading programs:', programsResult.error);
       }
       if (transactionsResult.error) {
-        console.error('Error loading transactions:', transactionsResult.error);
+        console.error('[Dashboard] Error loading transactions:', transactionsResult.error);
       }
       if (emailsResult.error) {
-        console.error('Error loading emails:', emailsResult.error);
+        console.error('[Dashboard] Error loading emails:', emailsResult.error);
       }
 
       const now = new Date();
@@ -118,8 +123,9 @@ export default function Dashboard() {
 
       const growthData = calculateCustomerGrowth(customersResult.data || []);
       setCustomerGrowth(growthData);
+      console.log('[Dashboard] Stats loaded successfully');
     } catch (error) {
-      console.error('Failed to load dashboard stats:', error);
+      console.error('[Dashboard] Failed to load dashboard stats:', error);
     }
   };
 

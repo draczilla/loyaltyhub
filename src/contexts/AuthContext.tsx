@@ -401,16 +401,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, companyName: string, tierId: string) => {
+    console.log('[AuthContext] Starting signup process');
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
     });
 
     if (authError || !authData.user) {
+      console.error('[AuthContext] Signup auth error:', authError);
       return { error: authError };
     }
 
+    console.log('[AuthContext] Auth user created:', authData.user.id);
+
     // Check if tenant already exists for this user
+    console.log('[AuthContext] Checking for existing tenant');
     const { data: existingTenant } = await supabase
       .from('tenants')
       .select('*')
@@ -421,6 +426,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Create tenant only if it doesn't exist
     if (!existingTenant) {
+      console.log('[AuthContext] Creating new tenant');
       const { data: newTenant, error: tenantError } = await supabase
         .from('tenants')
         .insert({
@@ -431,10 +437,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
 
       if (tenantError) {
+        console.error('[AuthContext] Tenant creation error:', tenantError);
         return { error: tenantError as any };
       }
 
+      console.log('[AuthContext] Tenant created:', newTenant.id);
       tenantToUse = newTenant;
+    } else {
+      console.log('[AuthContext] Using existing tenant:', existingTenant.id);
     }
 
     const { data: existingBusiness } = await supabase
@@ -444,11 +454,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
 
     if (!tenantToUse) {
+      console.error('[AuthContext] No tenant available');
       return { error: { message: 'Failed to create or find tenant' } as any };
     }
 
     // Create business only if it doesn't exist
     if (!existingBusiness) {
+      console.log('[AuthContext] Creating business record');
       const { error: businessError } = await supabase
         .from('businesses')
         .insert({
@@ -468,10 +480,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
       if (businessError) {
+        console.error('[AuthContext] Business creation error:', businessError);
         return { error: businessError as any };
       }
 
+      console.log('[AuthContext] Business created successfully');
+
       // Create tenant member record
+      console.log('[AuthContext] Creating tenant member record');
       const { error: memberError } = await supabase
         .from('tenant_members')
         .insert({
@@ -483,10 +499,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
       if (memberError) {
-        console.error('Error creating tenant member:', memberError);
+        console.error('[AuthContext] Tenant member creation error:', memberError);
+      } else {
+        console.log('[AuthContext] Tenant member created successfully');
       }
+
+      // Wait a moment for the database to fully commit
+      console.log('[AuthContext] Waiting for database commit...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Force a fresh load of business data
+      console.log('[AuthContext] Loading fresh business data after signup');
+      await loadBusiness(authData.user.id);
+    } else {
+      console.log('[AuthContext] Business already exists, loading data');
+      await loadBusiness(authData.user.id);
     }
 
+    console.log('[AuthContext] Signup process completed successfully');
     return { error: null };
   };
 
