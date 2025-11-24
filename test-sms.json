@@ -1,1 +1,5 @@
-{"isTestSms":true,"recipientPhone":"+4793018426","message":"Test Quick SMS"}
+{
+  "isTestSms": true,
+  "recipientPhone": "+4793018426",
+  "message": "Test Quick SMS from direct API call"
+}
