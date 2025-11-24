@@ -12,13 +12,45 @@ export default defineConfig({
     minify: 'esbuild',
     target: 'es2015',
     cssCodeSplit: true,
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 500,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'supabase': ['@supabase/supabase-js'],
-          'stripe': ['@stripe/stripe-js'],
+        manualChunks: (id) => {
+          // Vendor chunks
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+              return 'react-vendor';
+            }
+            if (id.includes('@supabase')) {
+              return 'supabase';
+            }
+            if (id.includes('@stripe')) {
+              return 'stripe';
+            }
+            if (id.includes('lucide-react')) {
+              return 'icons';
+            }
+            if (id.includes('qrcode')) {
+              return 'qrcode';
+            }
+            // Other node_modules
+            return 'vendor';
+          }
+
+          // Split admin pages into separate chunk
+          if (id.includes('/src/pages/SuperAdmin')) {
+            return 'admin-pages';
+          }
+
+          // Split customer portal into separate chunk
+          if (id.includes('/src/pages/Customer')) {
+            return 'customer-portal';
+          }
+
+          // Split verification pages
+          if (id.includes('/src/pages/Verify') || id.includes('/src/pages/AcceptInvitation')) {
+            return 'verification';
+          }
         },
         chunkFileNames: 'assets/[name]-[hash].js',
         entryFileNames: 'assets/[name]-[hash].js',
@@ -27,12 +59,11 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ['lucide-react'],
-    include: ['@stripe/stripe-js', '@supabase/supabase-js'],
+    include: ['@stripe/stripe-js', '@supabase/supabase-js', 'react', 'react-dom', 'react-router-dom', 'lucide-react'],
   },
   server: {
     warmup: {
-      clientFiles: ['./src/main.tsx', './src/App.tsx', './src/contexts/AuthContext.tsx'],
+      clientFiles: ['./src/main.tsx', './src/App.tsx', './src/contexts/AuthContext.tsx', './src/pages/Landing.tsx', './src/pages/Login.tsx'],
     },
   },
 });

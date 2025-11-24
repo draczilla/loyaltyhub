@@ -68,6 +68,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const initAuth = async () => {
       try {
+        // Check cache FIRST for instant restore
+        const cachedAuthState = sessionStorage.getItem('auth_state');
+        const cachedTimestamp = sessionStorage.getItem('auth_timestamp');
+
+        if (cachedAuthState && cachedTimestamp) {
+          const age = Date.now() - parseInt(cachedTimestamp);
+          if (age < 60000) { // Extend cache time to 1 minute
+            try {
+              const cached = JSON.parse(cachedAuthState);
+              if (cached.user) {
+                // Restore from cache immediately
+                console.log('[AuthContext] Restoring from cache');
+                setUser(cached.user);
+                setBusiness(cached.business);
+                setTenant(cached.tenant);
+                setIsSuperAdmin(cached.isSuperAdmin);
+                setIsTenantAdmin(cached.isTenantAdmin);
+                setLoading(false);
+
+                // Verify session in background
+                supabase.auth.getSession().then(({ data: { session } }) => {
+                  if (mounted && session?.user) {
+                    setSession(session);
+                    // Refresh data if needed
+                    if (session.user.id === cached.user.id) {
+                      loadAuthDataInBackground(session.user.id);
+                    } else {
+                      // Session user mismatch, reload
+                      loadBusiness(session.user.id);
+                    }
+                  } else if (mounted && !session) {
+                    // Session expired, clear state
+                    setBusiness(null);
+                    setTenant(null);
+                    setIsSuperAdmin(false);
+                    setIsTenantAdmin(false);
+                    setUser(null);
+                    sessionStorage.removeItem('auth_state');
+                    sessionStorage.removeItem('auth_timestamp');
+                  }
+                });
+                return;
+              }
+            } catch (e) {
+              console.warn('[AuthContext] Invalid cached auth state');
+              sessionStorage.removeItem('auth_state');
+              sessionStorage.removeItem('auth_timestamp');
+            }
+          }
+        }
+
+        // No cache or expired, fetch session
         console.log('[AuthContext] Fetching session from Supabase');
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
@@ -85,40 +137,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          // Check cache first, but only if we have a valid session
-          const cachedAuthState = sessionStorage.getItem('auth_state');
-          const cachedTimestamp = sessionStorage.getItem('auth_timestamp');
-
-          if (cachedAuthState && cachedTimestamp) {
-            const age = Date.now() - parseInt(cachedTimestamp);
-            if (age < 30000) {
-              try {
-                const cached = JSON.parse(cachedAuthState);
-                if (cached.user && cached.user.id === session.user.id) {
-                  // Use cached data for instant UI
-                  console.log('[AuthContext] Using cached auth state');
-                  setBusiness(cached.business);
-                  setTenant(cached.tenant);
-                  setIsSuperAdmin(cached.isSuperAdmin);
-                  setIsTenantAdmin(cached.isTenantAdmin);
-                  setLoading(false);
-                  // Refresh in background
-                  loadAuthDataInBackground(session.user.id);
-                  return;
-                }
-              } catch (e) {
-                console.warn('[AuthContext] Invalid cached auth state');
-                sessionStorage.removeItem('auth_state');
-                sessionStorage.removeItem('auth_timestamp');
-              }
-            }
-          }
-          // No valid cache, load fresh data
-          console.log('[AuthContext] Loading fresh business data');
+          // Load fresh data
+          console.log('[AuthContext] Loading business data');
           await loadBusiness(session.user.id);
         } else {
-          // Clear any stale cache
-          console.log('[AuthContext] No session, clearing cache and setting loading to false');
+          // No session
+          console.log('[AuthContext] No session, clearing state');
           sessionStorage.removeItem('auth_state');
           sessionStorage.removeItem('auth_timestamp');
           setLoading(false);
@@ -132,13 +156,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    // Set a timeout to force loading to false after 5 seconds (reduced from 10)
+    // Reduced timeout to 2 seconds for faster failure
     timeoutId = setTimeout(() => {
       if (mounted) {
         console.error('[AuthContext] Auth initialization timeout - forcing loading to false');
         setLoading(false);
       }
-    }, 5000);
+    }, 2000);
 
     initAuth();
 
