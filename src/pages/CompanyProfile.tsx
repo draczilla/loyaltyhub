@@ -486,7 +486,7 @@ export default function CompanyProfile() {
                     <Building2 className="w-5 h-5 text-orange-400" />
                   </div>
                   <div>
-                    <h1 className="text-2xl font-bold text-white">Company Profile</h1>
+                    <h1 className="text-2xl font-bold text-white">Account Profile</h1>
                     <p className="text-gray-400 text-sm mt-1">Manage your team and company settings</p>
                   </div>
                 </div>
