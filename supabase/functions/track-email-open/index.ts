@@ -15,6 +15,7 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req: Request) => {
+  console.warn("[DEPRECATED] track-email-open function is deprecated. LoyaltyHub now uses Brevo's native tracking API via webhooks and periodic polling. This endpoint remains for backwards compatibility with legacy emails only.");
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 200,

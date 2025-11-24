@@ -21,9 +21,9 @@ interface TestEmail {
   created_at: string;
   opened_at: string | null;
   open_count: number;
-  tracking_token: string | null;
   error_message: string | null;
   is_test_email?: boolean;
+  provider_message_id?: string | null;
   metadata: {
     recipient_email?: string;
     recipient_name?: string;
@@ -88,7 +88,7 @@ export default function TestEmailTracking() {
     try {
       const { data, error } = await supabase
         .from('communication_logs')
-        .select('id, subject, status, created_at, opened_at, open_count, tracking_token, error_message, metadata')
+        .select('id, subject, status, created_at, opened_at, open_count, error_message, metadata, provider_message_id')
         .eq('business_id', business.id)
         .eq('type', 'email')
         .eq('is_test_email', true)
@@ -284,8 +284,8 @@ export default function TestEmailTracking() {
           <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-gray-300">
             <p className="mb-2">
-              Test emails always include tracking pixels, regardless of your tracking toggle setting.
-              This allows you to verify both email delivery and tracking functionality.
+              Test emails use Brevo's native tracking API to verify email delivery and tracking functionality.
+              Tracking data updates via webhooks and periodic polling (every 15 minutes).
             </p>
             <p className="text-gray-400">
               Limited to 3 test emails per hour to prevent abuse.
@@ -444,11 +444,11 @@ export default function TestEmailTracking() {
                   </div>
                 )}
 
-                {email.tracking_token && (
+                {email.provider_message_id && (
                   <div className="text-xs text-gray-500 mt-2 pt-2 border-t border-zinc-700">
-                    <span className="font-medium">Tracking URL:</span>
+                    <span className="font-medium">Brevo Message ID:</span>
                     <code className="ml-2 text-gray-400 break-all">
-                      {import.meta.env.VITE_SUPABASE_URL}/functions/v1/track-email-open?token={email.tracking_token}
+                      {email.provider_message_id}
                     </code>
                   </div>
                 )}

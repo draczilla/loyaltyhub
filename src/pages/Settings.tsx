@@ -431,14 +431,14 @@ export default function Settings() {
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                 <h2 className="text-xl font-bold text-white mb-4">Email Tracking</h2>
                 <p className="text-gray-400 text-sm mb-6">
-                  Enable or disable email open tracking using tracking pixels
+                  Enable or disable email open tracking using Brevo's native tracking API
                 </p>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-6">
                   <div>
                     <h3 className="text-white font-medium">Email Open Tracking</h3>
                     <p className="text-sm text-gray-400 mt-1">
-                      Track when customers open emails with a 1x1 pixel
+                      Track when customers open emails via Brevo
                     </p>
                   </div>
                   <button
@@ -453,6 +453,29 @@ export default function Settings() {
                       }`}
                     />
                   </button>
+                </div>
+
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-gray-300">
+                      <p className="font-medium text-white mb-2">Brevo Native Tracking</p>
+                      <p className="mb-3">
+                        LoyaltyHub uses Brevo's built-in tracking API for reliable email open and click tracking.
+                      </p>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs text-gray-400 mb-1">Webhook URL (configure in Brevo dashboard):</p>
+                          <code className="block text-xs bg-black px-3 py-2 rounded border border-zinc-700 break-all">
+                            {import.meta.env.VITE_SUPABASE_URL}/functions/v1/brevo-webhook-handler
+                          </code>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-3">
+                          Tracking data updates automatically via webhooks and periodic polling every 15 minutes.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
