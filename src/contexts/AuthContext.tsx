@@ -298,6 +298,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
     let timeoutId: NodeJS.Timeout;
+    const startTime = performance.now();
 
     console.log('[AuthContext] Initializing authentication');
 
@@ -305,7 +306,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         // No cache or expired, fetch session
         console.log('[AuthContext] Fetching session from Supabase');
+        const sessionStartTime = performance.now();
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        console.log(`[AuthContext] Session fetch took ${(performance.now() - sessionStartTime).toFixed(2)}ms`);
 
         if (sessionError) {
           console.error('[AuthContext] Error fetching session:', sessionError);
@@ -316,6 +319,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        // Clear timeout as we got a response
+        clearTimeout(timeoutId);
+
         console.log('[AuthContext] Session:', session ? 'User logged in' : 'No session');
         setSession(session);
         setUser(session?.user ?? null);
@@ -323,7 +329,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           // Load fresh data
           console.log('[AuthContext] Loading business data');
+          const businessStartTime = performance.now();
           await loadBusiness(session.user.id);
+          console.log(`[AuthContext] Business data load took ${(performance.now() - businessStartTime).toFixed(2)}ms`);
         } else {
           // No session
           console.log('[AuthContext] No session, clearing state');
@@ -331,8 +339,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           sessionStorage.removeItem('auth_timestamp');
           setLoading(false);
         }
+        console.log(`[AuthContext] Total auth initialization took ${(performance.now() - startTime).toFixed(2)}ms`);
       } catch (error) {
         console.error('[AuthContext] Error initializing auth:', error);
+        clearTimeout(timeoutId);
         if (mounted) {
           console.log('[AuthContext] Setting loading to false due to error');
           setLoading(false);
@@ -340,13 +350,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    // Reduced timeout to 2 seconds for faster failure
+    // Increased timeout to 5 seconds to allow for business data loading
     timeoutId = setTimeout(() => {
       if (mounted) {
         console.error('[AuthContext] Auth initialization timeout - forcing loading to false');
         setLoading(false);
       }
-    }, 2000);
+    }, 5000);
 
     initAuth();
 
