@@ -115,15 +115,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (userError) {
+        console.error('Error fetching user:', userError);
+        throw userError;
+      }
 
       if (!user || !user.email) {
-        console.error('Cannot create business: no user email found');
-        setBusiness(null);
-        setTenant(null);
-        setIsSuperAdmin(false);
-        setIsTenantAdmin(false);
-        return;
+        console.error('Cannot create business: no user email found', { user });
+        // Instead of returning, throw an error so we can retry
+        throw new Error('User email not available');
       }
 
       const { data: tierData } = await supabase
@@ -255,15 +257,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const loadBusiness = async (userId: string) => {
+  const loadBusiness = async (userId: string, retryCount = 0) => {
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 1000;
+
     try {
-      console.log('Loading business data for user:', userId);
+      console.log('Loading business data for user:', userId, `(attempt ${retryCount + 1})`);
 
       // Use the combined RPC function for better performance
       const { data, error } = await supabase.rpc('get_user_auth_data', { user_id_param: userId });
 
       if (error) {
         console.error('Error loading auth data:', error);
+
+        // If it's a network error and we haven't exceeded retries, retry
+        if (error.message?.includes('Failed to fetch') && retryCount < MAX_RETRIES) {
+          console.log(`Retrying in ${RETRY_DELAY}ms...`);
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+          return loadBusiness(userId, retryCount + 1);
+        }
+
         // Fallback to creating business for OAuth users
         await createBusinessForOAuthUser(userId);
         return;
@@ -285,6 +298,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       console.error('Exception loading business:', error);
+
+      // Retry on network errors
+      if (error instanceof Error && error.message?.includes('Failed to fetch') && retryCount < MAX_RETRIES) {
+        console.log(`Retrying in ${RETRY_DELAY}ms...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        return loadBusiness(userId, retryCount + 1);
+      }
+
       setBusiness(null);
       setTenant(null);
       setIsSuperAdmin(false);
