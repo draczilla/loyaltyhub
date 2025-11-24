@@ -84,33 +84,28 @@ export default function QuickSmsModal({
     try {
       const message = replaceVariables(selectedTemplate.message_template);
 
-      const smsResult = await sendTransactionalSms(customer.phone, message);
+      // Send SMS with business context for credit deduction
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-transactional-sms`;
+      const { data: { session } } = await supabase.auth.getSession();
 
-      if (!smsResult.success) {
-        throw new Error(smsResult.error || 'Failed to send SMS');
-      }
-
-      const { error: logError } = await supabase.from('communication_logs').insert({
-        business_id: businessId,
-        customer_id: customer.id,
-        type: 'sms',
-        template_id: selectedTemplate.id,
-        template_name: selectedTemplate.name,
-        subject: null,
-        content: message,
-        status: 'sent',
-        metadata: {},
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          businessId: businessId,
+          customerId: customer.id,
+          recipientPhone: customer.phone,
+          message: message,
+          isTestSms: false,
+        }),
       });
 
-      if (logError) throw logError;
-
-      const { error: usageError } = await supabase.rpc('increment_business_usage', {
-        p_business_id: businessId,
-        p_column_name: 'usage_sms_monthly',
-      });
-
-      if (usageError) {
-        console.error('Failed to increment SMS usage:', usageError);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to send SMS');
       }
 
       setSuccess(true);

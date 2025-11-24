@@ -263,9 +263,21 @@ Deno.serve(async (req: Request) => {
         );
       }
     } else {
-      if (!businessId || !customerId || !triggerType) {
+      // For Quick SMS: businessId, customerId, recipientPhone, and message are provided
+      // For Transactional SMS: businessId, customerId, and triggerType are provided
+      if (!businessId || !customerId) {
         return new Response(
-          JSON.stringify({ error: "Missing required fields" }),
+          JSON.stringify({ error: "Missing required fields: businessId and customerId are required" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      if (!triggerType && (!recipientPhone || !message)) {
+        return new Response(
+          JSON.stringify({ error: "Either triggerType OR (recipientPhone and message) must be provided" }),
           {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -282,6 +294,65 @@ Deno.serve(async (req: Request) => {
     if (isTestSms) {
       finalMessage = message!;
       finalRecipientPhone = recipientPhone!;
+    } else if (recipientPhone && message && !triggerType) {
+      // Quick SMS mode: message and phone provided directly
+      const { data: businessData } = await supabase
+        .from("businesses")
+        .select("id, company_name, tier_id, usage_sms_monthly, subscription_status")
+        .eq("id", businessId!)
+        .maybeSingle();
+
+      if (!businessData) {
+        return new Response(
+          JSON.stringify({ error: "Business not found" }),
+          {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      business = businessData;
+
+      const { data: customerData } = await supabase
+        .from("customers")
+        .select("id, phone, first_name, last_name, total_points, opted_in_sms")
+        .eq("id", customerId!)
+        .eq("business_id", businessId!)
+        .maybeSingle();
+
+      if (!customerData) {
+        return new Response(
+          JSON.stringify({ error: "Customer not found" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      customer = customerData;
+
+      const { data: tier } = await supabase
+        .from("subscription_tiers")
+        .select("max_sms_monthly")
+        .eq("id", business.tier_id)
+        .maybeSingle();
+
+      if (tier && tier.max_sms_monthly > 0) {
+        if (business.usage_sms_monthly >= tier.max_sms_monthly) {
+          return new Response(
+            JSON.stringify({ error: "SMS quota exceeded" }),
+            {
+              status: 403,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+      }
+
+      finalMessage = message;
+      finalRecipientPhone = recipientPhone;
     } else {
       const { data: businessData } = await supabase
         .from("businesses")
