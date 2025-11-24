@@ -16,7 +16,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
     key: supabaseAnonKey ? 'Set' : 'Missing'
   });
 
-  throw new Error('Missing Supabase environment variables. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your deployment settings.');
+  throw new Error('Missing Supabase environment variables');
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
