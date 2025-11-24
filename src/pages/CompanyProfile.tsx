@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { detectCountryDialCode, getAllCountries, getDialCode } from '../lib/countryCode';
 import Sidebar from '../components/Sidebar';
 import {
   Menu, Building2, Users, Mail, AlertCircle, Check,
   UserPlus, Trash2, RefreshCw, XCircle, Crown, User,
-  CheckCircle, Shield, Smartphone, Loader
+  CheckCircle, Shield, Smartphone, Loader, ChevronDown
 } from 'lucide-react';
 
 interface TenantMember {
@@ -50,6 +51,10 @@ export default function CompanyProfile() {
   const [sendingPhoneVerification, setSendingPhoneVerification] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [showPhoneInput, setShowPhoneInput] = useState(false);
+  const [selectedCountryCode, setSelectedCountryCode] = useState('US');
+  const [dialCode, setDialCode] = useState('+1');
+  const [detectingCountry, setDetectingCountry] = useState(false);
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const [creditsEligibility, setCreditsEligibility] = useState<any>(null);
 
   useEffect(() => {
@@ -61,6 +66,45 @@ export default function CompanyProfile() {
       loadCreditsEligibility();
     }
   }, [tenant, business]);
+
+  // Detect country code when phone input is shown
+  useEffect(() => {
+    if (showPhoneInput && !detectingCountry) {
+      detectUserCountry();
+    }
+  }, [showPhoneInput]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showCountryDropdown && !(event.target as Element).closest('.country-dropdown')) {
+        setShowCountryDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showCountryDropdown]);
+
+  const detectUserCountry = async () => {
+    setDetectingCountry(true);
+    try {
+      const { countryCode, dialCode: detectedDialCode } = await detectCountryDialCode();
+      setSelectedCountryCode(countryCode);
+      setDialCode(detectedDialCode);
+    } catch (error) {
+      console.error('Failed to detect country:', error);
+      // Keep default US values
+    } finally {
+      setDetectingCountry(false);
+    }
+  };
+
+  const handleCountryChange = (countryCode: string) => {
+    setSelectedCountryCode(countryCode);
+    setDialCode(getDialCode(countryCode));
+    setShowCountryDropdown(false);
+  };
 
   const createTenantForExistingUser = async () => {
     if (!business) return;
@@ -178,7 +222,8 @@ export default function CompanyProfile() {
     setSuccess('');
 
     try {
-      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+1${phoneNumber}`;
+      // Combine dial code with phone number
+      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `${dialCode}${phoneNumber}`;
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-phone-verification`,
@@ -574,29 +619,75 @@ export default function CompanyProfile() {
                         </div>
                       </>
                     ) : showPhoneInput ? (
-                      <div className="space-y-2">
-                        <div className="flex gap-2">
-                          <div className="w-16 px-2 py-2 bg-black border border-zinc-700 rounded text-white text-center text-sm">
-                            +1
+                      <div className="space-y-3">
+                        <div className="flex gap-2 relative">
+                          {/* Country Code Dropdown */}
+                          <div className="relative country-dropdown">
+                            <button
+                              type="button"
+                              onClick={() => setShowCountryDropdown(!showCountryDropdown)}
+                              disabled={detectingCountry}
+                              className="h-full px-3 py-2 bg-black border border-zinc-700 rounded text-white text-sm hover:border-zinc-600 focus:outline-none focus:border-orange-500 transition flex items-center gap-1 min-w-[80px]"
+                            >
+                              {detectingCountry ? (
+                                <Loader className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <>
+                                  <span>{dialCode}</span>
+                                  <ChevronDown className="w-3 h-3 text-gray-400" />
+                                </>
+                              )}
+                            </button>
+
+                            {/* Dropdown Menu */}
+                            {showCountryDropdown && (
+                              <div className="absolute top-full left-0 mt-1 w-64 max-h-60 overflow-y-auto bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl z-50">
+                                {getAllCountries().map((country) => (
+                                  <button
+                                    key={country.code}
+                                    type="button"
+                                    onClick={() => handleCountryChange(country.code)}
+                                    className={`w-full px-3 py-2 text-left text-sm hover:bg-zinc-800 transition flex items-center justify-between ${
+                                      selectedCountryCode === country.code ? 'bg-zinc-800 text-orange-400' : 'text-white'
+                                    }`}
+                                  >
+                                    <span className="truncate">{country.name}</span>
+                                    <span className="text-gray-400 ml-2">{country.dialCode}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
+
+                          {/* Phone Number Input */}
                           <input
                             type="tel"
                             value={phoneNumber}
                             onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
-                            placeholder="5551234567"
-                            className="flex-1 px-3 py-2 bg-black border border-zinc-700 rounded text-white placeholder-gray-500 text-sm focus:outline-none focus:border-orange-500"
+                            placeholder="Phone number"
+                            className="flex-1 px-3 py-2 bg-black border border-zinc-700 rounded text-white placeholder-gray-500 text-sm focus:outline-none focus:border-orange-500 transition"
                           />
                         </div>
+
+                        <p className="text-xs text-gray-500">
+                          Country detected from your location. You can change it using the dropdown.
+                        </p>
+
                         <div className="flex gap-2">
                           <button
-                            onClick={() => setShowPhoneInput(false)}
+                            type="button"
+                            onClick={() => {
+                              setShowPhoneInput(false);
+                              setShowCountryDropdown(false);
+                            }}
                             className="flex-1 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded text-sm transition"
                           >
                             Cancel
                           </button>
                           <button
+                            type="button"
                             onClick={handleSendPhoneVerification}
-                            disabled={sendingPhoneVerification || !phoneNumber || phoneNumber.length < 10}
+                            disabled={sendingPhoneVerification || !phoneNumber || phoneNumber.length < 7}
                             className="flex-1 px-3 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded text-sm transition flex items-center justify-center gap-2"
                           >
                             {sendingPhoneVerification ? (
