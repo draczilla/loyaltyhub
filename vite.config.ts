@@ -59,7 +59,22 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['@stripe/stripe-js', '@supabase/supabase-js', 'react', 'react-dom', 'react-router-dom', 'lucide-react'],
+    include: [
+      '@stripe/stripe-js',
+      '@supabase/supabase-js',
+      '@supabase/postgrest-js',
+      '@supabase/realtime-js',
+      '@supabase/storage-js',
+      '@supabase/functions-js',
+      'react',
+      'react-dom',
+      'react-router-dom',
+      'lucide-react'
+    ],
+    force: false,
+  },
+  resolve: {
+    dedupe: ['react', 'react-dom'],
   },
   server: {
     warmup: {
