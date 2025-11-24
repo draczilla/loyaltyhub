@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
+import TestEmailTracking from '../components/TestEmailTracking';
 import { Menu, Mail, Save, AlertCircle, Check, Eye, EyeOff, Shield, Info } from 'lucide-react';
 
 interface EmailConfig {
@@ -453,6 +454,14 @@ export default function Settings() {
                     />
                   </button>
                 </div>
+              </div>
+
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                <h2 className="text-xl font-bold text-white mb-4">Test Email Tracking</h2>
+                <p className="text-gray-400 text-sm mb-6">
+                  Send test emails to verify delivery and tracking functionality
+                </p>
+                <TestEmailTracking />
               </div>
             </div>
           )}

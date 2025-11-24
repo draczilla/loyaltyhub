@@ -240,6 +240,39 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    if (isTestEmail && businessId) {
+      const { data: rateLimitData, error: rateLimitError } = await supabase
+        .rpc("check_test_email_rate_limit", { p_business_id: businessId })
+        .maybeSingle();
+
+      if (rateLimitError) {
+        console.error("Error checking rate limit:", rateLimitError);
+        return new Response(
+          JSON.stringify({ error: "Failed to check rate limit" }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      if (rateLimitData && !rateLimitData.allowed) {
+        return new Response(
+          JSON.stringify({
+            error: "Rate limit exceeded",
+            message: `You have reached the limit of ${rateLimitData.limit} test emails per hour. Please try again after ${new Date(rateLimitData.reset_at).toLocaleTimeString()}.`,
+            remaining: rateLimitData.remaining,
+            reset_at: rateLimitData.reset_at,
+            limit: rateLimitData.limit,
+          }),
+          {
+            status: 429,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+
     if (!isTestEmail) {
       const { data: allowanceData, error: allowanceError } = await supabase
         .rpc("get_daily_email_allowance")
@@ -268,7 +301,7 @@ Deno.serve(async (req: Request) => {
     let emailTrackingEnabled = false;
 
     if (isTestEmail) {
-      emailTrackingEnabled = false;
+      emailTrackingEnabled = true;
     } else {
       if (!businessId) {
         return new Response(
@@ -415,7 +448,7 @@ Deno.serve(async (req: Request) => {
           htmlBody
         );
 
-    if (!isTestEmail && businessId) {
+    if (businessId) {
       const { error: logError } = await supabase
         .from("communication_logs")
         .insert({
@@ -431,6 +464,7 @@ Deno.serve(async (req: Request) => {
           tracking_token: emailTrackingEnabled ? trackingToken : null,
           provider: useBrevo ? "brevo" : "sendgrid",
           provider_message_id: sendResult.messageId || null,
+          is_test_email: isTestEmail || false,
           metadata: {
             recipient_email: recipientEmail,
             recipient_name: recipientName,
@@ -443,7 +477,13 @@ Deno.serve(async (req: Request) => {
         console.error("Error logging email:", logError);
       }
 
-      if (sendResult.success) {
+      if (sendResult.success && isTestEmail) {
+        await supabase.rpc("increment_test_email_count", {
+          p_business_id: businessId,
+        });
+      }
+
+      if (sendResult.success && !isTestEmail) {
         await supabase.rpc("increment_business_usage", {
           p_business_id: businessId,
           p_column_name: "usage_email_monthly",

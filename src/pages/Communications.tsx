@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
-import { Menu, Mail, MessageSquare, Search, CheckCircle, XCircle, Clock, Eye, User } from 'lucide-react';
+import { Menu, Mail, MessageSquare, Search, CheckCircle, XCircle, Clock, Eye, User, Beaker } from 'lucide-react';
 
 interface CommunicationLog {
   id: string;
@@ -16,6 +16,11 @@ interface CommunicationLog {
   open_count: number;
   provider: string | null;
   created_at: string;
+  is_test_email: boolean;
+  metadata?: {
+    recipient_email?: string;
+    recipient_name?: string;
+  };
   customer: {
     first_name: string | null;
     last_name: string | null;
@@ -31,6 +36,7 @@ export default function Communications() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'email' | 'sms'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'sent' | 'failed' | 'opened'>('all');
+  const [showTestEmails, setShowTestEmails] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedLog, setSelectedLog] = useState<CommunicationLog | null>(null);
@@ -43,6 +49,10 @@ export default function Communications() {
 
   useEffect(() => {
     let filtered = logs;
+
+    if (!showTestEmails) {
+      filtered = filtered.filter(log => !log.is_test_email);
+    }
 
     if (filterType !== 'all') {
       filtered = filtered.filter(log => log.type === filterType);
@@ -58,24 +68,31 @@ export default function Communications() {
 
     if (searchQuery) {
       filtered = filtered.filter(log => {
-        const customerName = [log.customer.first_name, log.customer.last_name]
+        const customerName = [log.customer?.first_name, log.customer?.last_name]
           .filter(Boolean)
           .join(' ')
           .toLowerCase();
+        const recipientEmail = log.metadata?.recipient_email || log.customer?.email || '';
         const searchLower = searchQuery.toLowerCase();
 
         return (
           customerName.includes(searchLower) ||
-          log.customer.email?.toLowerCase().includes(searchLower) ||
-          log.customer.phone?.includes(searchQuery) ||
+          recipientEmail.toLowerCase().includes(searchLower) ||
+          log.customer?.phone?.includes(searchQuery) ||
           log.subject?.toLowerCase().includes(searchLower) ||
           log.template_name?.toLowerCase().includes(searchLower)
         );
       });
     }
 
+    filtered.sort((a, b) => {
+      if (a.is_test_email && !b.is_test_email) return 1;
+      if (!a.is_test_email && b.is_test_email) return -1;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
     setFilteredLogs(filtered);
-  }, [searchQuery, filterType, filterStatus, logs]);
+  }, [searchQuery, filterType, filterStatus, showTestEmails, logs]);
 
   const loadCommunicationLogs = async () => {
     if (!business) return;
@@ -208,6 +225,18 @@ export default function Communications() {
                   <option value="opened">Opened</option>
                   <option value="failed">Failed</option>
                 </select>
+
+                <button
+                  onClick={() => setShowTestEmails(!showTestEmails)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 ${
+                    showTestEmails
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-black border border-zinc-700 text-gray-400 hover:border-orange-500'
+                  }`}
+                >
+                  <Beaker className="w-4 h-4" />
+                  {showTestEmails ? 'Hide Tests' : 'Show Tests'}
+                </button>
               </div>
             </div>
           </div>
@@ -233,26 +262,42 @@ export default function Communications() {
               {filteredLogs.map((log) => (
                 <div
                   key={log.id}
-                  className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-700 transition cursor-pointer"
+                  className={`border rounded-xl p-4 hover:border-zinc-700 transition cursor-pointer ${
+                    log.is_test_email
+                      ? 'bg-blue-500/5 border-blue-500/20'
+                      : 'bg-zinc-900 border-zinc-800'
+                  }`}
                   onClick={() => setSelectedLog(log)}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                        log.type === 'email' ? 'bg-blue-500/10' : 'bg-green-500/10'
-                      }`}>
-                        {log.type === 'email' ? (
-                          <Mail className={`w-5 h-5 ${log.type === 'email' ? 'text-blue-400' : 'text-green-400'}`} />
-                        ) : (
-                          <MessageSquare className="w-5 h-5 text-green-400" />
-                        )}
-                      </div>
+                      {log.is_test_email && (
+                        <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <Beaker className="w-5 h-5 text-blue-400" />
+                        </div>
+                      )}
+                      {!log.is_test_email && (
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                          log.type === 'email' ? 'bg-blue-500/10' : 'bg-green-500/10'
+                        }`}>
+                          {log.type === 'email' ? (
+                            <Mail className={`w-5 h-5 ${log.type === 'email' ? 'text-blue-400' : 'text-green-400'}`} />
+                          ) : (
+                            <MessageSquare className="w-5 h-5 text-green-400" />
+                          )}
+                        </div>
+                      )}
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="text-white font-medium truncate">
                             {log.template_name || (log.type === 'email' ? 'Email Message' : 'SMS Message')}
                           </h3>
+                          {log.is_test_email && (
+                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                              Test
+                            </span>
+                          )}
                           <span className={`px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(log.status, log.opened_at)}`}>
                             {getStatusLabel(log)}
                           </span>
@@ -265,10 +310,12 @@ export default function Communications() {
                         <div className="flex items-center gap-3 text-xs text-gray-500">
                           <span className="flex items-center gap-1">
                             <User className="w-3 h-3" />
-                            {[log.customer.first_name, log.customer.last_name].filter(Boolean).join(' ') ||
-                              log.customer.email ||
-                              log.customer.phone ||
-                              'Unknown'}
+                            {log.is_test_email
+                              ? (log.metadata?.recipient_email || 'Test Recipient')
+                              : ([log.customer?.first_name, log.customer?.last_name].filter(Boolean).join(' ') ||
+                                log.customer?.email ||
+                                log.customer?.phone ||
+                                'Unknown')}
                           </span>
                           <span>{formatDate(log.created_at)}</span>
                           {log.provider && (
