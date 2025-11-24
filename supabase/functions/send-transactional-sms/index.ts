@@ -538,6 +538,19 @@ Deno.serve(async (req: Request) => {
           p_business_id: businessId,
           p_column_name: "usage_sms_monthly",
         });
+
+        // Deduct 1 credit for successful SMS
+        const { error: creditError } = await supabase
+          .from("businesses")
+          .update({
+            credits_remaining: supabase.raw("credits_remaining - 1"),
+          })
+          .eq("id", businessId)
+          .gte("credits_remaining", 1);
+
+        if (creditError) {
+          console.error("Error deducting SMS credit:", creditError);
+        }
       }
     }
 
