@@ -48,6 +48,23 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Validate E.164 format (must start with +)
+    if (!phone.startsWith('+')) {
+      console.error('Invalid phone format received:', phone);
+      return new Response(
+        JSON.stringify({
+          error: "Invalid phone format",
+          message: "Phone number must be in E.164 format (starting with +)",
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    console.log('Processing phone verification for:', phone);
+
     const { data: business } = await supabase
       .from("businesses")
       .select("email_verified, onboarding_status")
@@ -110,7 +127,7 @@ Deno.serve(async (req: Request) => {
       .rpc("generate_verification_token", {
         p_business_id: businessId,
         p_verification_type: "phone",
-        p_expiry_hours: 0.25,
+        p_expiry_hours: 1,
       })
       .single();
 
@@ -122,7 +139,7 @@ Deno.serve(async (req: Request) => {
     const appUrl = Deno.env.get("APP_URL") || "http://localhost:5173";
     const verificationUrl = `${appUrl}/verify-phone?token=${verificationToken}`;
 
-    const smsMessage = `${companyName}: Complete your account setup by verifying your phone. Click: ${verificationUrl} (Expires in 15 min)`;
+    const smsMessage = `${companyName}: Complete your account setup by verifying your phone. Click: ${verificationUrl} (Expires in 1 hour)`;
 
     const brevoResponse = await fetch("https://api.brevo.com/v3/transactionalSMS/sms", {
       method: "POST",
@@ -132,7 +149,7 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         type: "transactional",
-        sender: "LoyaltyApp",
+        sender: "AdaptIQ",
         recipient: phone,
         content: smsMessage,
       }),
@@ -153,10 +170,10 @@ Deno.serve(async (req: Request) => {
     await supabase.from("communication_logs").insert({
       business_id: businessId,
       type: "sms",
-      recipient: phone,
-      message: smsMessage,
+      content: smsMessage,
       status: "sent",
       provider: "brevo",
+      metadata: { phone: phone },
     });
 
     return new Response(

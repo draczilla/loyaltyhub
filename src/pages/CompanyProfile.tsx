@@ -222,8 +222,15 @@ export default function CompanyProfile() {
     setSuccess('');
 
     try {
-      // Combine dial code with phone number
-      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `${dialCode}${phoneNumber}`;
+      // Combine dial code with phone number - ensure E.164 format
+      let formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `${dialCode}${phoneNumber}`;
+
+      // Validate E.164 format: must start with +
+      if (!formattedPhone.startsWith('+')) {
+        throw new Error('Phone number must be in E.164 format (starting with +)');
+      }
+
+      console.log('Sending SMS to:', formattedPhone); // Debug log
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-phone-verification`,
