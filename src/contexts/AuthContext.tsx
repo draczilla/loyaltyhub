@@ -96,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 const cached = JSON.parse(cachedAuthState);
                 if (cached.user && cached.user.id === session.user.id) {
                   // Use cached data for instant UI
+                  console.log('[AuthContext] Using cached auth state');
                   setBusiness(cached.business);
                   setTenant(cached.tenant);
                   setIsSuperAdmin(cached.isSuperAdmin);
@@ -131,19 +132,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    // Set a timeout to force loading to false after 10 seconds
+    // Set a timeout to force loading to false after 5 seconds (reduced from 10)
     timeoutId = setTimeout(() => {
-      if (mounted && loading) {
+      if (mounted) {
         console.error('[AuthContext] Auth initialization timeout - forcing loading to false');
         setLoading(false);
       }
-    }, 10000);
+    }, 5000);
 
     initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
 
+      console.log('[AuthContext] Auth state changed:', _event);
       setSession(session);
       setUser(session?.user ?? null);
 
@@ -159,6 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => {
+      console.log('[AuthContext] Cleaning up auth subscription');
       mounted = false;
       clearTimeout(timeoutId);
       subscription.unsubscribe();
