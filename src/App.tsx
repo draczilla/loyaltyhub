@@ -232,9 +232,9 @@ function App() {
           element={<Navigate to="/company-profile" replace />}
         />
         <Route path="/accept-invitation" element={<AcceptInvitation />} />
-        <Route path="/pending-verification" element={<Navigate to="/company-profile" replace />} />
+        <Route path="/pending-verification" element={<CompanyProfile />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
-        <Route path="/verify-phone-setup" element={<Navigate to="/company-profile" replace />} />
+        <Route path="/verify-phone-setup" element={<CompanyProfile />} />
         <Route path="/verify-phone" element={<VerifyPhone />} />
       </Routes>
     </Suspense>

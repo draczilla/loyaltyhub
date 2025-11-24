@@ -30,6 +30,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     '/verify-email',
     '/verify-phone-setup',
     '/verify-phone',
+    '/company-profile', // Company profile handles verification status internally
   ];
 
   const isVerificationRoute = verificationRoutes.some(route =>
