@@ -42,7 +42,9 @@ export default function VerifyEmail() {
           setNextStep((data as any).next_step || '');
 
           setTimeout(() => {
-            navigate('/company-profile?verified=email');
+            // Redirect to dashboard after successful email verification
+            // Users can verify phone later from Company Profile if needed
+            navigate('/dashboard');
           }, 2000);
         } else {
           setStatus('error');

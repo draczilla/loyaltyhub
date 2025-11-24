@@ -39,13 +39,13 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   // Check onboarding status and redirect if needed (skip for verification routes)
   if (business && !isVerificationRoute) {
-    if (business.onboarding_status === 'pending_email') {
+    // Only enforce email verification - phone verification is optional
+    if (business.onboarding_status === 'pending_email' && !business.email_verified) {
       return <Navigate to="/pending-verification" replace />;
     }
 
-    if (business.onboarding_status === 'pending_phone') {
-      return <Navigate to="/verify-phone-setup" replace />;
-    }
+    // Don't enforce phone verification - allow users to skip it
+    // They can verify phone from Company Profile page at any time
   }
 
   return <>{children}</>;
