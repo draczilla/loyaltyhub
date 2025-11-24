@@ -11,8 +11,7 @@ import {
   AlertCircle,
   Info,
   Eye,
-  Calendar,
-  ExternalLink
+  Calendar
 } from 'lucide-react';
 
 interface TestEmail {
@@ -24,6 +23,7 @@ interface TestEmail {
   open_count: number;
   tracking_token: string | null;
   error_message: string | null;
+  is_test_email?: boolean;
   metadata: {
     recipient_email?: string;
     recipient_name?: string;
@@ -130,7 +130,7 @@ export default function TestEmailTracking() {
         throw new Error('Not authenticated');
       }
 
-      const testSubject = `Test Email from ${business.name || 'Your Business'} - LoyaltyHub Tracking Verification`;
+      const testSubject = `Test Email from Your Business - LoyaltyHub Tracking Verification`;
       const testBody = `
 <!DOCTYPE html>
 <html>
@@ -173,7 +173,7 @@ export default function TestEmailTracking() {
     </div>
 
     <p style="color: #6b7280; font-size: 13px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center;">
-      This test email was sent from <strong>${business.name || 'LoyaltyHub'}</strong><br>
+      This test email was sent from <strong>LoyaltyHub</strong><br>
       Powered by LoyaltyHub Email Tracking
     </p>
   </div>
