@@ -11,11 +11,6 @@ export async function sendTransactionalSms(
   phoneOrParams: string | SendTransactionalSmsParams,
   message?: string
 ): Promise<{ success: boolean; error?: string }> {
-  if (typeof phoneOrParams === 'string' && message) {
-    return { success: true };
-  }
-
-  const params = phoneOrParams as SendTransactionalSmsParams;
   const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-transactional-sms`;
 
   const headers = {
@@ -24,10 +19,24 @@ export async function sendTransactionalSms(
   };
 
   try {
+    let payload: any;
+
+    // Direct SMS (Quick SMS feature)
+    if (typeof phoneOrParams === 'string' && message) {
+      payload = {
+        isTestSms: true,
+        recipientPhone: phoneOrParams,
+        message: message,
+      };
+    } else {
+      // Transactional SMS via trigger
+      payload = phoneOrParams as SendTransactionalSmsParams;
+    }
+
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify(params),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {

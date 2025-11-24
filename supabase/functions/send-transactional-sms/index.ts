@@ -248,6 +248,20 @@ Deno.serve(async (req: Request) => {
           }
         );
       }
+
+      // Validate E.164 format for test SMS
+      if (!recipientPhone.startsWith('+')) {
+        return new Response(
+          JSON.stringify({
+            error: "Invalid phone format",
+            message: "Phone number must be in E.164 format (starting with +)",
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
     } else {
       if (!businessId || !customerId || !triggerType) {
         return new Response(
