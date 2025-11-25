@@ -105,8 +105,7 @@ async function sendEmailViaSendGrid(
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        personalizations: [
+      body: JSON.stringify({        personalizations: [
           {
             to: [{ email: toEmail, name: toName || toEmail }],
             subject: subject,
@@ -235,63 +234,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (isTestEmail && businessId) {
-      const { data: rateLimitData, error: rateLimitError } = await supabase
-        .rpc("check_test_email_rate_limit", { p_business_id: businessId })
-        .maybeSingle();
-
-      if (rateLimitError) {
-        console.error("Error checking rate limit:", rateLimitError);
-        return new Response(
-          JSON.stringify({ error: "Failed to check rate limit" }),
-          {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-
-      if (rateLimitData && !rateLimitData.allowed) {
-        return new Response(
-          JSON.stringify({
-            error: "Rate limit exceeded",
-            message: `You have reached the limit of ${rateLimitData.limit} test emails per hour. Please try again after ${new Date(rateLimitData.reset_at).toLocaleTimeString()}.`,
-            remaining: rateLimitData.remaining,
-            reset_at: rateLimitData.reset_at,
-            limit: rateLimitData.limit,
-          }),
-          {
-            status: 429,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-    }
-
-    if (!isTestEmail) {
-      const { data: allowanceData, error: allowanceError } = await supabase
-        .rpc("get_daily_email_allowance")
-        .maybeSingle();
-
-      if (allowanceError) {
-        console.error("Error checking daily allowance:", allowanceError);
-      } else if (allowanceData && allowanceData.remaining_today <= 0) {
-        return new Response(
-          JSON.stringify({
-            error: "Daily email limit reached",
-            message: `Daily limit of ${allowanceData.daily_limit} emails has been reached. Limit resets at midnight UTC.`,
-            sent_today: allowanceData.sent_today,
-            daily_limit: allowanceData.daily_limit,
-            reset_time: allowanceData.reset_time,
-          }),
-          {
-            status: 429,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-    }
-
     let business: any = null;
     let emailTrackingEnabled = false;
     let resolvedBusinessId = businessId;
@@ -373,6 +315,63 @@ Deno.serve(async (req: Request) => {
       if (business.usage_email_monthly >= emailLimit) {
         return new Response(
           JSON.stringify({ error: "Email quota exceeded for this billing period" }),
+          {
+            status: 429,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+
+    if (isTestEmail && resolvedBusinessId) {
+      const { data: rateLimitData, error: rateLimitError } = await supabase
+        .rpc("check_test_email_rate_limit", { p_business_id: resolvedBusinessId })
+        .maybeSingle();
+
+      if (rateLimitError) {
+        console.error("Error checking rate limit:", rateLimitError);
+        return new Response(
+          JSON.stringify({ error: "Failed to check rate limit" }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      if (rateLimitData && !rateLimitData.allowed) {
+        return new Response(
+          JSON.stringify({
+            error: "Rate limit exceeded",
+            message: `You have reached the limit of ${rateLimitData.limit} test emails per hour. Please try again after ${new Date(rateLimitData.reset_at).toLocaleTimeString()}.`,
+            remaining: rateLimitData.remaining,
+            reset_at: rateLimitData.reset_at,
+            limit: rateLimitData.limit,
+          }),
+          {
+            status: 429,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+
+    if (!isTestEmail) {
+      const { data: allowanceData, error: allowanceError } = await supabase
+        .rpc("get_daily_email_allowance")
+        .maybeSingle();
+
+      if (allowanceError) {
+        console.error("Error checking daily allowance:", allowanceError);
+      } else if (allowanceData && allowanceData.remaining_today <= 0) {
+        return new Response(
+          JSON.stringify({
+            error: "Daily email limit reached",
+            message: `Daily limit of ${allowanceData.daily_limit} emails has been reached. Limit resets at midnight UTC.`,
+            sent_today: allowanceData.sent_today,
+            daily_limit: allowanceData.daily_limit,
+            reset_time: allowanceData.reset_time,
+          }),
           {
             status: 429,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
