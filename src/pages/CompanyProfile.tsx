@@ -548,12 +548,25 @@ export default function CompanyProfile() {
               {/* Verification Status Card */}
               <div className="bg-gradient-to-br from-zinc-900 to-zinc-800 border border-zinc-700 rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="w-12 h-12 bg-orange-500/10 rounded-lg flex items-center justify-center">
-                    <Shield className="w-6 h-6 text-orange-400" />
+                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                    business?.email_verified && business?.phone_verified
+                      ? 'bg-green-500/10'
+                      : 'bg-orange-500/10'
+                  }`}>
+                    <Shield className={`w-6 h-6 ${
+                      business?.email_verified && business?.phone_verified
+                        ? 'text-green-400'
+                        : 'text-orange-400'
+                    }`} />
                   </div>
                   <div>
                     <h2 className="text-xl font-bold text-white">Account Verification</h2>
-                    <p className="text-sm text-gray-400">Complete verification to unlock communication features and credits</p>
+                    <p className="text-sm text-gray-400">
+                      {business?.email_verified && business?.phone_verified
+                        ? 'Your account is verified - Great! You are eligible for monthly FREE credits.'
+                        : 'Complete verification to unlock communication features and credits'
+                      }
+                    </p>
                   </div>
                 </div>
 
