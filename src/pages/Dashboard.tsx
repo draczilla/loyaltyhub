@@ -160,6 +160,17 @@ export default function Dashboard() {
     return monthsData;
   };
 
+  const calculateDaysRemaining = () => {
+    if (!business?.trial_ends_at) return null;
+
+    const now = new Date();
+    const trialEnd = new Date(business.trial_ends_at);
+    const diffTime = trialEnd.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    return diffDays > 0 ? diffDays : 0;
+  };
+
   return (
     <div className="min-h-screen bg-black flex">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -263,7 +274,9 @@ export default function Dashboard() {
             <div className="mb-6 bg-orange-500/10 border border-orange-500/20 rounded-lg p-4 flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
               <div>
-                <h3 className="text-orange-400 font-medium mb-1">Trial Period Active</h3>
+                <h3 className="text-orange-400 font-medium mb-1">
+                  Trial Period Active {calculateDaysRemaining() !== null && `(${calculateDaysRemaining()} days remaining)`}
+                </h3>
                 <p className="text-gray-300 text-sm">
                   You're currently on a trial. Upgrade to continue enjoying premium features without interruption.
                 </p>

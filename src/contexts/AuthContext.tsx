@@ -16,6 +16,7 @@ interface Business {
   credits_remaining: number;
   stripe_price_id: string | null;
   subscription_period_end: string | null;
+  trial_ends_at: string | null;
   tenant_id: string | null;
   is_tenant_admin: boolean;
   email_verified: boolean;
