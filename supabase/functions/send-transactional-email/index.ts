@@ -294,6 +294,7 @@ Deno.serve(async (req: Request) => {
 
     let business: any = null;
     let emailTrackingEnabled = false;
+    let resolvedBusinessId = businessId;
 
     if (isTestEmail) {
       emailTrackingEnabled = true;
@@ -310,7 +311,7 @@ Deno.serve(async (req: Request) => {
 
       let { data: businessData, error: businessError } = await supabase
         .from("businesses")
-        .select("tier_id, usage_email_monthly, email_tracking_enabled, tenant_id")
+        .select("id, tier_id, usage_email_monthly, email_tracking_enabled, tenant_id")
         .eq("id", businessId)
         .maybeSingle();
 
@@ -334,14 +335,15 @@ Deno.serve(async (req: Request) => {
           if (tenantData?.admin_user_id) {
             const { data: adminBusinessData } = await supabase
               .from("businesses")
-              .select("tier_id, usage_email_monthly, email_tracking_enabled, tenant_id")
+              .select("id, tier_id, usage_email_monthly, email_tracking_enabled, tenant_id")
               .eq("id", tenantData.admin_user_id)
               .maybeSingle();
 
             if (adminBusinessData) {
               businessData = adminBusinessData;
+              resolvedBusinessId = adminBusinessData.id;
               businessError = null;
-              console.log("Found business via tenant admin lookup");
+              console.log("Found business via tenant admin lookup, resolved ID:", resolvedBusinessId);
             }
           }
         }
@@ -381,11 +383,11 @@ Deno.serve(async (req: Request) => {
 
     let emailConfig: EmailConfig = {};
 
-    if (businessId && !isTestEmail) {
+    if (resolvedBusinessId && !isTestEmail) {
       const { data: integration } = await supabase
         .from("integrations")
         .select("email_config")
-        .eq("business_id", businessId)
+        .eq("business_id", resolvedBusinessId)
         .eq("active", true)
         .maybeSingle();
 
@@ -471,11 +473,11 @@ Deno.serve(async (req: Request) => {
           htmlBody
         );
 
-    if (businessId) {
+    if (resolvedBusinessId) {
       const { error: logError } = await supabase
         .from("communication_logs")
         .insert({
-          business_id: businessId,
+          business_id: resolvedBusinessId,
           customer_id: customerId || null,
           type: "email",
           template_id: templateId || null,
@@ -502,13 +504,13 @@ Deno.serve(async (req: Request) => {
 
       if (sendResult.success && isTestEmail) {
         await supabase.rpc("increment_test_email_count", {
-          p_business_id: businessId,
+          p_business_id: resolvedBusinessId,
         });
       }
 
       if (sendResult.success && !isTestEmail) {
         await supabase.rpc("increment_business_usage", {
-          p_business_id: businessId,
+          p_business_id: resolvedBusinessId,
           p_column_name: "usage_email_monthly",
         });
 
@@ -518,7 +520,7 @@ Deno.serve(async (req: Request) => {
           .update({
             credits_remaining: supabase.raw("credits_remaining - 1"),
           })
-          .eq("id", businessId)
+          .eq("id", resolvedBusinessId)
           .gte("credits_remaining", 1);
 
         if (creditError) {
