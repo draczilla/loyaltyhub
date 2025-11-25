@@ -157,7 +157,7 @@ function convertPlainTextToHtml(text: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
+    .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#039;");
 
   const paragraphs = escaped.split(/\n\n+/).map((para) => {
@@ -510,7 +510,7 @@ Deno.serve(async (req: Request) => {
         );
 
     if (resolvedBusinessId) {
-      const { error: logError } = await supabase
+      const { data: logData, error: logError } = await supabase
         .from("communication_logs")
         .insert({
           business_id: resolvedBusinessId,
@@ -533,7 +533,9 @@ Deno.serve(async (req: Request) => {
             from_name: fromName,
             tracking_enabled: emailTrackingEnabled,
           },
-        });
+        })
+        .select('id')
+        .single();
 
       if (logError) {
         console.error("Error logging email:", logError);
@@ -555,14 +557,23 @@ Deno.serve(async (req: Request) => {
           p_column_name: "usage_email_monthly",
         });
 
-        const { error: creditError } = await supabase.rpc("deduct_credits", {
+        // Deduct 1 credit using the unified credit deduction function
+        const { data: creditResult, error: creditError } = await supabase.rpc("deduct_communication_credit", {
           p_business_id: resolvedBusinessId,
           p_amount: 1,
-          p_reason: "Email sent",
+          p_communication_type: "email",
+          p_reference_id: logData?.id || null,
         });
 
         if (creditError) {
           console.error("Error deducting email credit:", creditError);
+        } else if (creditResult && creditResult.length > 0) {
+          const result = creditResult[0];
+          if (result.success) {
+            console.log(`Email credit deducted successfully. Remaining credits: ${result.remaining_credits}`);
+          } else {
+            console.error(`Failed to deduct credit: ${result.error_message}`);
+          }
         }
       }
     }

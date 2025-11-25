@@ -570,7 +570,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!isTestSms && businessId) {
-      const { error: logError } = await supabase
+      const { data: logData, error: logError } = await supabase
         .from("communication_logs")
         .insert({
           business_id: businessId,
@@ -584,7 +584,9 @@ Deno.serve(async (req: Request) => {
           metadata: {
             recipient_phone: finalRecipientPhone,
           },
-        });
+        })
+        .select('id')
+        .single();
 
       if (logError) {
         console.error("Error logging SMS:", logError);
@@ -610,17 +612,23 @@ Deno.serve(async (req: Request) => {
           p_column_name: "usage_sms_monthly",
         });
 
-        // Deduct 1 credit for successful SMS
-        const { error: creditError } = await supabase
-          .from("businesses")
-          .update({
-            credits_remaining: supabase.raw("credits_remaining - 1"),
-          })
-          .eq("id", businessId)
-          .gte("credits_remaining", 1);
+        // Deduct 1 credit using the unified credit deduction function
+        const { data: creditResult, error: creditError } = await supabase.rpc("deduct_communication_credit", {
+          p_business_id: businessId,
+          p_amount: 1,
+          p_communication_type: "sms",
+          p_reference_id: logData?.id || null,
+        });
 
         if (creditError) {
           console.error("Error deducting SMS credit:", creditError);
+        } else if (creditResult && creditResult.length > 0) {
+          const result = creditResult[0];
+          if (result.success) {
+            console.log(`SMS credit deducted successfully. Remaining credits: ${result.remaining_credits}`);
+          } else {
+            console.error(`Failed to deduct credit: ${result.error_message}`);
+          }
         }
       }
     }
