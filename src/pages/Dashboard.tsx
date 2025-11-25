@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Users, Gift, QrCode, TrendingUp, Menu, CheckCircle, XCircle, AlertCircle, Mail, Eye, Info, LineChart } from 'lucide-react';
+import { Users, Gift, QrCode, TrendingUp, Menu, CheckCircle, XCircle, AlertCircle, Mail, Eye, Info, LineChart, ChevronLeft, ChevronRight } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import AddCustomerModal from '../components/AddCustomerModal';
 import SmsLogsModal from '../components/SmsLogsModal';
@@ -22,6 +22,7 @@ interface CustomerGrowthData {
   customers: number;
   growth: number;
   growthPercentage: number;
+  date: Date;
 }
 
 export default function Dashboard() {
@@ -43,6 +44,7 @@ export default function Dashboard() {
   const [paymentNotification, setPaymentNotification] = useState<'success' | 'cancelled' | null>(null);
   const [showVerificationBanner, setShowVerificationBanner] = useState(true);
   const [customerGrowth, setCustomerGrowth] = useState<CustomerGrowthData[]>([]);
+  const [dateOffset, setDateOffset] = useState(0);
 
   useEffect(() => {
     console.log('[Dashboard] Business context updated:', business?.id);
@@ -60,7 +62,7 @@ export default function Dashboard() {
       setSearchParams({});
       setTimeout(() => setPaymentNotification(null), 10000);
     }
-  }, [business, searchParams, setSearchParams]);
+  }, [business, searchParams, setSearchParams, dateOffset]);
 
   const loadDashboardStats = async () => {
     if (!business) {
@@ -125,7 +127,7 @@ export default function Dashboard() {
         emailOpenRate,
       });
 
-      const growthData = calculateCustomerGrowth(customersResult.data || []);
+      const growthData = calculateCustomerGrowth(customersResult.data || [], dateOffset);
       setCustomerGrowth(growthData);
       console.log('[Dashboard] Stats loaded successfully');
     } catch (error) {
@@ -133,38 +135,38 @@ export default function Dashboard() {
     }
   };
 
-  const calculateCustomerGrowth = (customers: Array<{ created_at: string }>) => {
+  const calculateCustomerGrowth = (customers: Array<{ created_at: string }>, offset: number = 0) => {
     const now = new Date();
     const daysData: CustomerGrowthData[] = [];
     const totalDays = 30;
-    const groupSize = 5; // Group every 5 days
 
-    for (let i = totalDays - 1; i >= 0; i -= groupSize) {
-      const endDate = new Date(now);
-      endDate.setDate(now.getDate() - i);
-      endDate.setHours(23, 59, 59, 999);
+    // Calculate the base date considering the offset
+    const baseDate = new Date(now);
+    baseDate.setDate(now.getDate() - (offset * totalDays));
 
-      const startDate = new Date(endDate);
-      startDate.setDate(endDate.getDate() - groupSize + 1);
-      startDate.setHours(0, 0, 0, 0);
+    for (let i = totalDays - 1; i >= 0; i--) {
+      const currentDate = new Date(baseDate);
+      currentDate.setDate(baseDate.getDate() - i);
+      currentDate.setHours(23, 59, 59, 999);
 
       const customersUpToDate = customers.filter(
-        c => new Date(c.created_at) <= endDate
+        c => new Date(c.created_at) <= currentDate
       ).length;
 
-      const previousPeriodCustomers = daysData.length > 0 ? daysData[daysData.length - 1].customers : 0;
-      const growth = customersUpToDate - previousPeriodCustomers;
-      const growthPercentage = previousPeriodCustomers > 0
-        ? Math.round((growth / previousPeriodCustomers) * 100)
+      const previousDayCustomers = daysData.length > 0 ? daysData[daysData.length - 1].customers : 0;
+      const growth = customersUpToDate - previousDayCustomers;
+      const growthPercentage = previousDayCustomers > 0
+        ? Math.round((growth / previousDayCustomers) * 100)
         : customersUpToDate > 0 ? 100 : 0;
 
-      const dayLabel = endDate.getDate().toString();
+      const dayLabel = currentDate.getDate().toString();
 
       daysData.push({
         month: dayLabel,
         customers: customersUpToDate,
         growth,
         growthPercentage,
+        date: new Date(currentDate),
       });
     }
 
@@ -402,14 +404,23 @@ export default function Dashboard() {
           </div>
 
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-8">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
-                <LineChart className="w-5 h-5 text-white" />
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
+                  <LineChart className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Customer Growth</h2>
+                  <p className="text-sm text-gray-400">Total customers over the last 30 days</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-bold text-white">Customer Growth</h2>
-                <p className="text-sm text-gray-400">Total customers over the last 30 days</p>
-              </div>
+              {customerGrowth.length > 0 && (
+                <div className="text-right">
+                  <div className="text-lg font-bold text-white">
+                    {customerGrowth[customerGrowth.length - 1].date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="relative" style={{ height: '300px' }}>
@@ -466,20 +477,39 @@ export default function Dashboard() {
             </div>
 
             {customerGrowth.length > 1 && (
-              <div className="mt-6 pt-4 border-t border-zinc-800">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-green-400" />
-                    <span className="text-gray-400">Growth Rate:</span>
-                    <span className="text-white font-medium">
-                      {customerGrowth[customerGrowth.length - 1].customers - customerGrowth[0].customers > 0
-                        ? `+${customerGrowth[customerGrowth.length - 1].customers - customerGrowth[0].customers}`
-                        : customerGrowth[customerGrowth.length - 1].customers - customerGrowth[0].customers} customers
-                    </span>
+              <>
+                <div className="mt-6 pt-4 border-t border-zinc-800">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="w-4 h-4 text-green-400" />
+                      <span className="text-gray-400">Growth Rate:</span>
+                      <span className="text-white font-medium">
+                        {customerGrowth[customerGrowth.length - 1].customers - customerGrowth[0].customers > 0
+                          ? `+${customerGrowth[customerGrowth.length - 1].customers - customerGrowth[0].customers}`
+                          : customerGrowth[customerGrowth.length - 1].customers - customerGrowth[0].customers} customers
+                      </span>
+                    </div>
+                    <div className="text-gray-500">Last 30 days</div>
                   </div>
-                  <div className="text-gray-500">Last 30 days</div>
                 </div>
-              </div>
+                <div className="mt-4 flex items-center justify-center gap-4">
+                  <button
+                    onClick={() => setDateOffset(dateOffset + 1)}
+                    className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors border border-zinc-700"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span className="text-sm">Previous 30 Days</span>
+                  </button>
+                  <button
+                    onClick={() => setDateOffset(dateOffset - 1)}
+                    disabled={dateOffset === 0}
+                    className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors border border-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-zinc-800"
+                  >
+                    <span className="text-sm">Next 30 Days</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </>
             )}
           </div>
 
