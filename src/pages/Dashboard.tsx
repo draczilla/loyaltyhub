@@ -6,6 +6,7 @@ import { Users, Gift, QrCode, TrendingUp, Menu, CheckCircle, XCircle, AlertCircl
 import Sidebar from '../components/Sidebar';
 import AddCustomerModal from '../components/AddCustomerModal';
 import SmsLogsModal from '../components/SmsLogsModal';
+import ReferralModal from '../components/ReferralModal';
 
 interface DashboardStats {
   totalCustomers: number;
@@ -38,6 +39,7 @@ export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
   const [showSmsLogsModal, setShowSmsLogsModal] = useState(false);
+  const [showReferralModal, setShowReferralModal] = useState(false);
   const [paymentNotification, setPaymentNotification] = useState<'success' | 'cancelled' | null>(null);
   const [showVerificationBanner, setShowVerificationBanner] = useState(true);
   const [customerGrowth, setCustomerGrowth] = useState<CustomerGrowthData[]>([]);
@@ -273,20 +275,33 @@ export default function Dashboard() {
           {business?.subscription_status === 'trial' && (
             <div className="mb-6 bg-orange-500/10 border border-orange-500/20 rounded-lg p-4 flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
-              <div>
+              <div className="flex-1">
                 <h3 className="text-orange-400 font-medium mb-1">
                   Trial Period Active {calculateDaysRemaining() !== null && `(${calculateDaysRemaining()} days remaining)`}
                 </h3>
-                <p className="text-gray-300 text-sm">
+                <p className="text-gray-300 text-sm mb-2">
                   You're currently on a trial. Upgrade to continue enjoying premium features without interruption.
                 </p>
+                <p className="text-gray-300 text-sm flex items-center gap-1">
+                  <Gift className="w-4 h-4 text-orange-400" />
+                  Refer a friend and earn an extra 50 FREE credits when they sign up with LoyaltyHUB
+                </p>
               </div>
-              <button
-                onClick={() => navigate('/subscription')}
-                className="ml-auto px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm transition"
-              >
-                View Plans
-              </button>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => navigate('/subscription')}
+                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm transition whitespace-nowrap"
+                >
+                  View Plans
+                </button>
+                <button
+                  onClick={() => setShowReferralModal(true)}
+                  className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 border border-orange-500/30 text-white rounded-lg text-sm transition whitespace-nowrap flex items-center gap-2"
+                >
+                  <Gift className="w-4 h-4" />
+                  Refer a Friend
+                </button>
+              </div>
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -505,6 +520,10 @@ export default function Dashboard() {
           businessId={business.id}
           onClose={() => setShowSmsLogsModal(false)}
         />
+      )}
+
+      {showReferralModal && (
+        <ReferralModal onClose={() => setShowReferralModal(false)} />
       )}
     </div>
   );

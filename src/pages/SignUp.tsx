@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { UserPlus, Check } from 'lucide-react';
+import { UserPlus, Check, Gift, CheckCircle, XCircle } from 'lucide-react';
 
 interface SubscriptionTier {
   id: string;
@@ -19,6 +19,9 @@ export default function SignUp() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [referralCode, setReferralCode] = useState('');
+  const [referralValid, setReferralValid] = useState<boolean | null>(null);
+  const [referrerName, setReferrerName] = useState<string>('');
   const [selectedTier, setSelectedTier] = useState('');
   const [tiers, setTiers] = useState<SubscriptionTier[]>([]);
   const [error, setError] = useState('');
@@ -26,9 +29,17 @@ export default function SignUp() {
   const { signUp, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     loadTiers();
+
+    // Check for referral code in URL
+    const refCode = searchParams.get('ref');
+    if (refCode) {
+      setReferralCode(refCode.toUpperCase());
+      validateReferralCode(refCode);
+    }
   }, []);
 
   useEffect(() => {
@@ -52,6 +63,52 @@ export default function SignUp() {
     }
   };
 
+  const validateReferralCode = async (code: string) => {
+    if (!code || code.trim() === '') {
+      setReferralValid(null);
+      setReferrerName('');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('validate_referral_code', {
+        p_referral_code: code.toUpperCase()
+      });
+
+      if (error) {
+        console.error('Error validating referral code:', error);
+        setReferralValid(false);
+        setReferrerName('');
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const result = data[0];
+        setReferralValid(result.valid);
+        setReferrerName(result.business_name || '');
+      } else {
+        setReferralValid(false);
+        setReferrerName('');
+      }
+    } catch (err) {
+      console.error('Error validating referral code:', err);
+      setReferralValid(false);
+      setReferrerName('');
+    }
+  };
+
+  const handleReferralCodeChange = (value: string) => {
+    const upperValue = value.toUpperCase();
+    setReferralCode(upperValue);
+
+    if (upperValue.length >= 8) {
+      validateReferralCode(upperValue);
+    } else if (upperValue.length === 0) {
+      setReferralValid(null);
+      setReferrerName('');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -63,12 +120,55 @@ export default function SignUp() {
       return;
     }
 
-    const { error } = await signUp(email, password, companyName, selectedTier);
-
-    if (error) {
-      setError(error.message);
+    // If referral code provided, validate it first
+    if (referralCode && !referralValid) {
+      setError('Invalid referral code. Please check and try again.');
       setLoading(false);
       return;
+    }
+
+    const { error: signUpError, user } = await signUp(email, password, companyName, selectedTier);
+
+    if (signUpError) {
+      setError(signUpError.message);
+      setLoading(false);
+      return;
+    }
+
+    // If referral code is valid, create referral record
+    if (referralCode && referralValid && user) {
+      try {
+        // Get the business ID for the newly created user
+        const { data: business } = await supabase
+          .from('businesses')
+          .select('id')
+          .eq('id', user.id)
+          .single();
+
+        if (business) {
+          // Get referrer business ID
+          const { data: referrerData } = await supabase.rpc('validate_referral_code', {
+            p_referral_code: referralCode
+          });
+
+          if (referrerData && referrerData.length > 0) {
+            const referrerBusinessId = referrerData[0].referrer_business_id;
+
+            // Create referral record
+            await supabase.from('referrals').insert({
+              referral_code: referralCode,
+              referrer_business_id: referrerBusinessId,
+              referred_business_id: business.id,
+              referred_email: email,
+              referral_status: 'signed_up',
+              month_of_referral: new Date().toISOString().substring(0, 7)
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Error creating referral record:', err);
+        // Don't fail signup if referral tracking fails
+      }
     }
 
     navigate('/dashboard');
@@ -149,6 +249,45 @@ export default function SignUp() {
                 placeholder="••••••••"
               />
               <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
+            </div>
+
+            <div>
+              <label htmlFor="referralCode" className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+                <Gift className="w-4 h-4 text-orange-400" />
+                Referral Code (Optional)
+              </label>
+              <div className="relative">
+                <input
+                  id="referralCode"
+                  type="text"
+                  value={referralCode}
+                  onChange={(e) => handleReferralCodeChange(e.target.value)}
+                  maxLength={8}
+                  className="w-full px-4 py-3 bg-black border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition uppercase"
+                  placeholder="ABCD1234"
+                />
+                {referralCode && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {referralValid === true && (
+                      <CheckCircle className="w-5 h-5 text-green-400" />
+                    )}
+                    {referralValid === false && (
+                      <XCircle className="w-5 h-5 text-red-400" />
+                    )}
+                  </div>
+                )}
+              </div>
+              {referralValid && referrerName && (
+                <div className="mt-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                  <p className="text-green-400 text-sm flex items-center gap-2">
+                    <Gift className="w-4 h-4" />
+                    Joining with <strong>{referrerName}</strong>'s referral! You both earn rewards.
+                  </p>
+                </div>
+              )}
+              {referralValid === false && referralCode && (
+                <p className="text-xs text-red-400 mt-1">Invalid referral code</p>
+              )}
             </div>
 
             <div>
