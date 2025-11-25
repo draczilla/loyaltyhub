@@ -332,12 +332,12 @@ export default function Dashboard() {
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 bg-orange-500/10 rounded-lg flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-orange-400" />
+                  <Mail className="w-6 h-6 text-orange-400" />
                 </div>
               </div>
-              <h3 className="text-gray-400 text-sm mb-1">Transactions</h3>
-              <p className="text-3xl font-bold text-white">{stats.totalTransactions}</p>
-              <p className="text-sm text-gray-500 mt-2">All time</p>
+              <h3 className="text-gray-400 text-sm mb-1">Email Usage</h3>
+              <p className="text-3xl font-bold text-white">{stats.emailsSent}</p>
+              <p className="text-sm text-gray-500 mt-2">This month</p>
             </div>
 
             <button
