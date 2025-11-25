@@ -284,7 +284,7 @@ export default function Dashboard() {
                 </p>
                 <p className="text-gray-300 text-sm flex items-center gap-1">
                   <Gift className="w-4 h-4 text-orange-400" />
-                  Refer a friend and earn an extra 50 FREE credits when they sign up with LoyaltyHUB
+                  Refer a friend and earn up to 650 extra free credits when they sign up with LoyaltyHUB
                 </p>
               </div>
               <div className="flex flex-col gap-2">
