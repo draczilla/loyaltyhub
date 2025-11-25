@@ -15,7 +15,6 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req: Request) => {
-  console.warn("[DEPRECATED] track-email-open function is deprecated. LoyaltyHub now uses Brevo's native tracking API via webhooks and periodic polling. This endpoint remains for backwards compatibility with legacy emails only.");
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 200,
@@ -28,6 +27,7 @@ Deno.serve(async (req: Request) => {
     const token = url.searchParams.get("token");
 
     if (!token) {
+      console.log("No tracking token provided");
       return new Response(TRANSPARENT_GIF, {
         status: 200,
         headers: {
@@ -39,6 +39,8 @@ Deno.serve(async (req: Request) => {
         },
       });
     }
+
+    console.log("Tracking email open for token:", token);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -59,11 +61,23 @@ Deno.serve(async (req: Request) => {
 
     const { data: communicationLog, error: logError } = await supabase
       .from("communication_logs")
-      .select("id, business_id, customer_id")
+      .select("id, business_id, customer_id, opened_at, open_count")
       .eq("tracking_token", token)
       .maybeSingle();
 
-    if (logError || !communicationLog) {
+    if (logError) {
+      console.error("Error looking up communication log:", logError);
+      return new Response(TRANSPARENT_GIF, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "image/gif",
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+        },
+      });
+    }
+
+    if (!communicationLog) {
       console.log(`No communication log found for token: ${token}`);
       return new Response(TRANSPARENT_GIF, {
         status: 200,
@@ -75,6 +89,32 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    console.log("Found communication log:", communicationLog.id);
+
+    // Update the communication log with open information
+    const newOpenCount = (communicationLog.open_count || 0) + 1;
+    const updateData: any = {
+      open_count: newOpenCount,
+    };
+
+    // Set opened_at only on first open
+    if (!communicationLog.opened_at) {
+      updateData.opened_at = new Date().toISOString();
+      console.log("First open detected, setting opened_at");
+    }
+
+    const { error: updateError } = await supabase
+      .from("communication_logs")
+      .update(updateData)
+      .eq("id", communicationLog.id);
+
+    if (updateError) {
+      console.error("Error updating communication log:", updateError);
+    } else {
+      console.log(`Successfully tracked email open. Open count: ${newOpenCount}`);
+    }
+
+    // Also insert into email_opens table if it exists
     const userAgent = req.headers.get("user-agent") || null;
     const forwardedFor = req.headers.get("x-forwarded-for");
     const realIp = req.headers.get("x-real-ip");
@@ -97,7 +137,7 @@ Deno.serve(async (req: Request) => {
       });
 
     if (insertError) {
-      console.error("Error inserting email open:", insertError);
+      console.log("Note: email_opens table might not exist (this is optional):", insertError.message);
     }
 
     return new Response(TRANSPARENT_GIF, {
