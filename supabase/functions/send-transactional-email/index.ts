@@ -324,7 +324,6 @@ Deno.serve(async (req: Request) => {
       }
 
       business = businessData;
-      // Email tracking is always enabled for Brevo (native tracking)
       emailTrackingEnabled = true;
 
       const { data: tier } = await supabase
@@ -536,14 +535,11 @@ Deno.serve(async (req: Request) => {
           p_column_name: "usage_email_monthly",
         });
 
-        // Deduct 1 credit for successful email
-        const { error: creditError } = await supabase
-          .from("businesses")
-          .update({
-            credits_remaining: supabase.raw("credits_remaining - 1"),
-          })
-          .eq("id", resolvedBusinessId)
-          .gte("credits_remaining", 1);
+        const { error: creditError } = await supabase.rpc("deduct_credits", {
+          p_business_id: resolvedBusinessId,
+          p_amount: 1,
+          p_reason: "Email sent",
+        });
 
         if (creditError) {
           console.error("Error deducting email credit:", creditError);
