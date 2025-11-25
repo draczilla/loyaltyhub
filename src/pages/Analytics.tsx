@@ -12,7 +12,10 @@ import {
   ArrowDown,
   Calendar,
   Eye,
-  Send
+  Send,
+  LineChart,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 interface AnalyticsData {
@@ -26,6 +29,14 @@ interface AnalyticsData {
   emailsOpened: number;
   emailOpenRate: number;
   smsSent: number;
+}
+
+interface CustomerGrowthData {
+  month: string;
+  customers: number;
+  growth: number;
+  growthPercentage: number;
+  date: Date;
 }
 
 export default function Analytics() {
@@ -44,12 +55,51 @@ export default function Analytics() {
     emailOpenRate: 0,
     smsSent: 0
   });
+  const [customerGrowth, setCustomerGrowth] = useState<CustomerGrowthData[]>([]);
+  const [dateOffset, setDateOffset] = useState(0);
 
   useEffect(() => {
     if (business) {
       loadAnalytics();
     }
-  }, [business]);
+  }, [business, dateOffset]);
+
+  const calculateCustomerGrowth = (customers: Array<{ created_at: string }>, offset: number = 0) => {
+    const now = new Date();
+    const daysData: CustomerGrowthData[] = [];
+    const totalDays = 30;
+
+    const baseDate = new Date(now);
+    baseDate.setDate(now.getDate() - (offset * totalDays));
+
+    for (let i = totalDays - 1; i >= 0; i--) {
+      const currentDate = new Date(baseDate);
+      currentDate.setDate(baseDate.getDate() - i);
+      currentDate.setHours(23, 59, 59, 999);
+
+      const customersUpToDate = customers.filter(
+        c => new Date(c.created_at) <= currentDate
+      ).length;
+
+      const previousDayCustomers = daysData.length > 0 ? daysData[daysData.length - 1].customers : 0;
+      const growth = customersUpToDate - previousDayCustomers;
+      const growthPercentage = previousDayCustomers > 0
+        ? Math.round((growth / previousDayCustomers) * 100)
+        : customersUpToDate > 0 ? 100 : 0;
+
+      const dayLabel = currentDate.getDate().toString();
+
+      daysData.push({
+        month: dayLabel,
+        customers: customersUpToDate,
+        growth,
+        growthPercentage,
+        date: new Date(currentDate),
+      });
+    }
+
+    return daysData;
+  };
 
   const loadAnalytics = async () => {
     if (!business) return;
@@ -65,7 +115,7 @@ export default function Analytics() {
     ] = await Promise.all([
       supabase
         .from('customers')
-        .select('id', { count: 'exact' })
+        .select('id, created_at', { count: 'exact' })
         .eq('business_id', business.id),
       supabase
         .from('loyalty_programs')
@@ -94,6 +144,9 @@ export default function Analytics() {
     const emailsSent = emailsResult.data?.length || 0;
     const emailsOpened = emailsResult.data?.filter(e => e.opened_at !== null).length || 0;
     const emailOpenRate = emailsSent > 0 ? (emailsOpened / emailsSent) * 100 : 0;
+
+    const growthData = calculateCustomerGrowth(customersResult.data || [], dateOffset);
+    setCustomerGrowth(growthData);
 
     setAnalytics({
       totalCustomers: customersResult.count || 0,
@@ -251,17 +304,117 @@ export default function Analytics() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                  <h3 className="text-lg font-bold text-white mb-4">Customer Growth</h3>
-                  <div className="h-64 flex items-center justify-center text-gray-500">
-                    <div className="text-center">
-                      <TrendingUp className="w-12 h-12 mx-auto mb-2 text-gray-600" />
-                      <p>Chart visualization coming soon</p>
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-8">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
+                      <LineChart className="w-5 h-5 text-white" />
                     </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-white">Customer Growth</h2>
+                      <p className="text-sm text-gray-400">Total customers over the last 30 days</p>
+                    </div>
+                  </div>
+                  {customerGrowth.length > 0 && (
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-white">
+                        {customerGrowth[customerGrowth.length - 1].date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="relative" style={{ height: '300px' }}>
+                  <div className="absolute inset-0 flex items-end justify-between gap-4 px-4">
+                    {customerGrowth.map((data, index) => {
+                      const maxCustomers = Math.max(...customerGrowth.map(d => d.customers), 10);
+                      const heightPercentage = maxCustomers > 0 ? (data.customers / maxCustomers) * 100 : 0;
+                      const isLatest = index === customerGrowth.length - 1;
+                      const showGrowth = index > 0 && data.growth !== 0;
+                      const isPositiveGrowth = data.growth > 0;
+
+                      return (
+                        <div key={data.month} className="flex-1 flex flex-col items-center justify-end h-full group">
+                          <div className="relative w-full flex flex-col items-center justify-end h-full mb-2">
+                            <div className="absolute -top-12 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800 border border-zinc-700 px-3 py-2 rounded-lg z-10 whitespace-nowrap">
+                              <div className="text-white font-bold text-sm">{data.customers} customers</div>
+                              {showGrowth && (
+                                <div className={`text-xs mt-1 ${isPositiveGrowth ? 'text-green-400' : 'text-red-400'}`}>
+                                  {isPositiveGrowth ? '+' : ''}{data.growth} ({isPositiveGrowth ? '+' : ''}{data.growthPercentage}%)
+                                </div>
+                              )}
+                            </div>
+
+                            {showGrowth && (
+                              <div className={`absolute -top-6 text-xs font-medium ${
+                                isPositiveGrowth ? 'text-green-400' : 'text-red-400'
+                              }`}>
+                                {isPositiveGrowth ? '+' : ''}{data.growth}
+                              </div>
+                            )}
+
+                            <div
+                              className={`w-full rounded-t-lg transition-all duration-500 ease-out ${
+                                isLatest
+                                  ? 'bg-gradient-to-t from-orange-500 to-orange-400'
+                                  : 'bg-gradient-to-t from-orange-500/60 to-orange-400/60 group-hover:from-orange-500 group-hover:to-orange-400'
+                              }`}
+                              style={{
+                                height: `${heightPercentage}%`,
+                                minHeight: data.customers > 0 ? '4px' : '0px',
+                              }}
+                            />
+                          </div>
+                          <div className="text-center mt-2">
+                            <div className={`text-sm font-medium ${isLatest ? 'text-orange-400' : 'text-gray-400'}`}>
+                              {data.month}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">{data.customers}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
+                {customerGrowth.length > 1 && (
+                  <>
+                    <div className="mt-6 pt-4 border-t border-zinc-800">
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="w-4 h-4 text-green-400" />
+                          <span className="text-gray-400">Growth Rate:</span>
+                          <span className="text-white font-medium">
+                            {customerGrowth[customerGrowth.length - 1].customers - customerGrowth[0].customers > 0
+                              ? `+${customerGrowth[customerGrowth.length - 1].customers - customerGrowth[0].customers}`
+                              : customerGrowth[customerGrowth.length - 1].customers - customerGrowth[0].customers} customers
+                          </span>
+                        </div>
+                        <div className="text-gray-500">Last 30 days</div>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex items-center justify-center gap-4">
+                      <button
+                        onClick={() => setDateOffset(dateOffset + 1)}
+                        className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors border border-zinc-700"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                        <span className="text-sm">Previous 30 Days</span>
+                      </button>
+                      <button
+                        onClick={() => setDateOffset(dateOffset - 1)}
+                        disabled={dateOffset === 0}
+                        className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors border border-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-zinc-800"
+                      >
+                        <span className="text-sm">Next 30 Days</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                   <h3 className="text-lg font-bold text-white mb-4">Program Performance</h3>
                   <div className="h-64 flex items-center justify-center text-gray-500">
@@ -271,21 +424,15 @@ export default function Analytics() {
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                <h3 className="text-lg font-bold text-white mb-4">Recent Activity</h3>
-                <div className="space-y-4">
-                  {analytics.totalCustomers === 0 && analytics.campaignsSent === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <p>No activity yet</p>
-                      <p className="text-sm mt-2">Start by adding customers or creating campaigns</p>
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                  <h3 className="text-lg font-bold text-white mb-4">Recent Activity</h3>
+                  <div className="h-64 flex items-center justify-center text-gray-500">
+                    <div className="text-center">
+                      <TrendingUp className="w-12 h-12 mx-auto mb-2 text-gray-600" />
+                      <p>Activity feed coming soon</p>
                     </div>
-                  ) : (
-                    <div className="text-gray-500 text-center py-8">
-                      Activity feed coming soon
-                    </div>
-                  )}
+                  </div>
                 </div>
               </div>
             </div>
