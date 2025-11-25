@@ -308,20 +308,53 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      const { data: businessData, error: businessError } = await supabase
+      let { data: businessData, error: businessError } = await supabase
         .from("businesses")
-        .select("tier_id, usage_email_monthly, email_tracking_enabled")
+        .select("tier_id, usage_email_monthly, email_tracking_enabled, tenant_id")
         .eq("id", businessId)
         .maybeSingle();
 
       if (businessError || !businessData) {
-        return new Response(
-          JSON.stringify({ error: "Business not found" }),
-          {
-            status: 404,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        console.log("Direct business lookup failed, checking if user is tenant member...");
+
+        const { data: memberData } = await supabase
+          .from("tenant_members")
+          .select("tenant_id")
+          .eq("user_id", businessId)
+          .eq("status", "active")
+          .maybeSingle();
+
+        if (memberData?.tenant_id) {
+          const { data: tenantData } = await supabase
+            .from("tenants")
+            .select("admin_user_id")
+            .eq("id", memberData.tenant_id)
+            .maybeSingle();
+
+          if (tenantData?.admin_user_id) {
+            const { data: adminBusinessData } = await supabase
+              .from("businesses")
+              .select("tier_id, usage_email_monthly, email_tracking_enabled, tenant_id")
+              .eq("id", tenantData.admin_user_id)
+              .maybeSingle();
+
+            if (adminBusinessData) {
+              businessData = adminBusinessData;
+              businessError = null;
+              console.log("Found business via tenant admin lookup");
+            }
           }
-        );
+        }
+
+        if (!businessData) {
+          return new Response(
+            JSON.stringify({ error: "Business not found" }),
+            {
+              status: 404,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
       }
 
       business = businessData;
