@@ -256,7 +256,7 @@ Deno.serve(async (req: Request) => {
 
       let { data: businessData, error: businessError } = await supabase
         .from("businesses")
-        .select("id, tier_id, usage_email_monthly, email_tracking_enabled, tenant_id")
+        .select("id, tier_id, usage_email_monthly, tenant_id")
         .eq("id", businessId)
         .maybeSingle();
 
@@ -286,7 +286,7 @@ Deno.serve(async (req: Request) => {
           if (tenantData?.admin_user_id) {
             const { data: adminBusinessData, error: adminBusinessError } = await supabase
               .from("businesses")
-              .select("id, tier_id, usage_email_monthly, email_tracking_enabled, tenant_id")
+              .select("id, tier_id, usage_email_monthly, tenant_id")
               .eq("id", tenantData.admin_user_id)
               .maybeSingle();
 
@@ -324,7 +324,8 @@ Deno.serve(async (req: Request) => {
       }
 
       business = businessData;
-      emailTrackingEnabled = business.email_tracking_enabled ?? false;
+      // Email tracking is always enabled for Brevo (native tracking)
+      emailTrackingEnabled = true;
 
       const { data: tier } = await supabase
         .from("subscription_tiers")
