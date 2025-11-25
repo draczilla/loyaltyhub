@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { X, Mail, Send, AlertCircle, Check } from 'lucide-react';
+import { X, Mail, Send, AlertCircle, Check, Edit2 } from 'lucide-react';
 
 interface EmailTemplate {
   id: string;
@@ -39,6 +39,9 @@ export default function FastEmailModal({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedSubject, setEditedSubject] = useState('');
+  const [editedBody, setEditedBody] = useState('');
 
   useEffect(() => {
     loadTemplates();
@@ -70,6 +73,20 @@ export default function FastEmailModal({
       .replace(/\{points\}/g, customer.total_points.toString());
   };
 
+  const handleEditClick = () => {
+    if (selectedTemplate) {
+      setEditedSubject(replaceVariables(selectedTemplate.subject));
+      setEditedBody(replaceVariables(selectedTemplate.body));
+      setIsEditing(true);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditedSubject('');
+    setEditedBody('');
+  };
+
   const handleSend = async () => {
     if (!selectedTemplate || !customer.email) {
       setError('Customer email address is required');
@@ -80,8 +97,8 @@ export default function FastEmailModal({
     setError('');
 
     try {
-      const subject = replaceVariables(selectedTemplate.subject);
-      const body = replaceVariables(selectedTemplate.body);
+      const subject = isEditing ? editedSubject : replaceVariables(selectedTemplate.subject);
+      const body = isEditing ? editedBody : replaceVariables(selectedTemplate.body);
 
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -212,28 +229,87 @@ export default function FastEmailModal({
             </div>
           ) : (
             <div className="space-y-4">
-              <button
-                onClick={() => setSelectedTemplate(null)}
-                className="text-sm text-orange-400 hover:text-orange-300 transition"
-              >
-                ← Change template
-              </button>
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => {
+                    setSelectedTemplate(null);
+                    setIsEditing(false);
+                    setEditedSubject('');
+                    setEditedBody('');
+                  }}
+                  className="text-sm text-orange-400 hover:text-orange-300 transition"
+                >
+                  ← Change template
+                </button>
+                {!isEditing && (
+                  <button
+                    onClick={handleEditClick}
+                    className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 transition"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Quick Edit
+                  </button>
+                )}
+              </div>
 
-              <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-gray-300 mb-3">Preview:</h3>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Subject:</p>
-                    <p className="text-white font-medium">{replaceVariables(selectedTemplate.subject)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Message:</p>
-                    <p className="text-gray-300 whitespace-pre-wrap">
-                      {replaceVariables(selectedTemplate.body)}
+              {isEditing ? (
+                <div className="space-y-4">
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
+                    <p className="text-yellow-400 text-xs">
+                      Quick edit mode - changes will only apply to this message and won't be saved to the template.
                     </p>
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Subject:
+                    </label>
+                    <input
+                      type="text"
+                      value={editedSubject}
+                      onChange={(e) => setEditedSubject(e.target.value)}
+                      className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+                      placeholder="Email subject"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Message:
+                    </label>
+                    <textarea
+                      value={editedBody}
+                      onChange={(e) => setEditedBody(e.target.value)}
+                      rows={8}
+                      className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 resize-none"
+                      placeholder="Email message"
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleCancelEdit}
+                    className="text-sm text-gray-400 hover:text-white transition"
+                  >
+                    Cancel editing
+                  </button>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-4">
+                  <h3 className="text-sm font-medium text-gray-300 mb-3">Preview:</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Subject:</p>
+                      <p className="text-white font-medium">{replaceVariables(selectedTemplate.subject)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Message:</p>
+                      <p className="text-gray-300 whitespace-pre-wrap">
+                        {replaceVariables(selectedTemplate.body)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
