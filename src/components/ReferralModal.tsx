@@ -409,7 +409,7 @@ export default function ReferralModal({ onClose }: ReferralModalProps) {
               </div>
             </div>
             <p className="text-sm text-gray-400">
-              Next referral earns: <span className="text-white font-semibold">50 + {nextTierBonus} = {50 + nextTierBonus} credits</span>
+              Next referral earns: <span className="text-white font-semibold">50 credits</span>
             </p>
           </div>
 
