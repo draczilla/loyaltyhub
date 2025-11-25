@@ -6,7 +6,7 @@ import Sidebar from '../components/Sidebar';
 import {
   Menu, Building2, Users, Mail, AlertCircle, Check,
   UserPlus, Trash2, RefreshCw, XCircle, Crown, User,
-  CheckCircle, Shield, Smartphone, Loader, ChevronDown
+  CheckCircle, Shield, Smartphone, Loader, ChevronDown, Edit2, X, Save
 } from 'lucide-react';
 
 interface TenantMember {
@@ -56,6 +56,9 @@ export default function CompanyProfile() {
   const [detectingCountry, setDetectingCountry] = useState(false);
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const [creditsEligibility, setCreditsEligibility] = useState<any>(null);
+  const [isEditingCompanyInfo, setIsEditingCompanyInfo] = useState(false);
+  const [companyInfoForm, setCompanyInfoForm] = useState({ company_name: '', vat_number: '' });
+  const [savingCompanyInfo, setSavingCompanyInfo] = useState(false);
 
   useEffect(() => {
     if (business && !tenant) {
@@ -259,6 +262,52 @@ export default function CompanyProfile() {
       setError(err instanceof Error ? err.message : 'Failed to send verification SMS');
     } finally {
       setSendingPhoneVerification(false);
+    }
+  };
+
+  const handleSaveCompanyInfo = async () => {
+    if (!tenant || !companyInfoForm.company_name.trim()) return;
+
+    setSavingCompanyInfo(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      // Update tenant with new company info
+      const { error: tenantError } = await supabase
+        .from('tenants')
+        .update({
+          company_name: companyInfoForm.company_name.trim(),
+          vat_number: companyInfoForm.vat_number.trim() || null,
+        })
+        .eq('id', tenant.id);
+
+      if (tenantError) throw tenantError;
+
+      // Also update business table for consistency
+      if (business) {
+        const { error: businessError } = await supabase
+          .from('businesses')
+          .update({
+            company_name: companyInfoForm.company_name.trim(),
+            vat_number: companyInfoForm.vat_number.trim() || null,
+          })
+          .eq('id', business.id);
+
+        if (businessError) throw businessError;
+      }
+
+      setSuccess('Company information updated successfully!');
+      setIsEditingCompanyInfo(false);
+
+      // Reload the page to reflect changes
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update company information');
+    } finally {
+      setSavingCompanyInfo(false);
     }
   };
 
@@ -800,11 +849,79 @@ export default function CompanyProfile() {
 
               {/* Company Information */}
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-                <h2 className="text-xl font-bold text-white mb-4">Company Information</h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-bold text-white">Company Information</h2>
+                  {isTenantAdmin && !isEditingCompanyInfo && (
+                    <button
+                      onClick={() => {
+                        setCompanyInfoForm({
+                          company_name: tenant?.company_name || business?.company_name || '',
+                          vat_number: tenant?.vat_number || business?.vat_number || ''
+                        });
+                        setIsEditingCompanyInfo(true);
+                      }}
+                      className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition text-sm"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      Edit
+                    </button>
+                  )}
+                  {isEditingCompanyInfo && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setIsEditingCompanyInfo(false);
+                          setCompanyInfoForm({ company_name: '', vat_number: '' });
+                        }}
+                        className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition text-sm"
+                        disabled={savingCompanyInfo}
+                      >
+                        <X className="w-4 h-4" />
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveCompanyInfo}
+                        disabled={savingCompanyInfo || !companyInfoForm.company_name.trim()}
+                        className="flex items-center gap-2 px-3 py-2 bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white rounded-lg transition text-sm"
+                      >
+                        {savingCompanyInfo ? (
+                          <Loader className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Save className="w-4 h-4" />
+                        )}
+                        Save
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-400 mb-1">Company Name</label>
-                    <p className="text-white">{tenant?.company_name || business?.company_name}</p>
+                    {isEditingCompanyInfo ? (
+                      <input
+                        type="text"
+                        value={companyInfoForm.company_name}
+                        onChange={(e) => setCompanyInfoForm({ ...companyInfoForm, company_name: e.target.value })}
+                        className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500"
+                        placeholder="Enter company name"
+                      />
+                    ) : (
+                      <p className="text-white">{tenant?.company_name || business?.company_name}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">VAT Number</label>
+                    {isEditingCompanyInfo ? (
+                      <input
+                        type="text"
+                        value={companyInfoForm.vat_number}
+                        onChange={(e) => setCompanyInfoForm({ ...companyInfoForm, vat_number: e.target.value })}
+                        className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500"
+                        placeholder="Enter VAT number (optional)"
+                      />
+                    ) : (
+                      <p className="text-white">{tenant?.vat_number || business?.vat_number || 'Not provided'}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-400 mb-1">Admin Email</label>
