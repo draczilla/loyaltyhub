@@ -15,6 +15,7 @@ interface CommunicationLog {
   opened_at: string | null;
   open_count: number;
   provider: string | null;
+  provider_message_id: string | null;
   created_at: string;
   is_test_email: boolean;
   metadata?: {
@@ -323,6 +324,12 @@ export default function Communications() {
                               {log.provider}
                             </span>
                           )}
+                          {log.opened_at && log.type === 'email' && (
+                            <span className="text-xs text-blue-400 flex items-center gap-1" title={`First opened: ${formatDate(log.opened_at)}`}>
+                              <Eye className="w-3 h-3" />
+                              {log.open_count}x
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -392,10 +399,31 @@ export default function Communications() {
                   </div>
                 )}
 
+                {selectedLog.opened_at && selectedLog.open_count > 0 && (
+                  <div>
+                    <span className="text-gray-400">Total Opens:</span>
+                    <span className="text-white ml-2">{selectedLog.open_count}</span>
+                  </div>
+                )}
+
+                {!selectedLog.opened_at && selectedLog.type === 'email' && selectedLog.status === 'sent' && (
+                  <div>
+                    <span className="text-gray-400">Open Status:</span>
+                    <span className="text-yellow-400 ml-2">Not opened yet</span>
+                  </div>
+                )}
+
                 <div>
                   <span className="text-gray-400">Sent:</span>
                   <span className="text-white ml-2">{formatDate(selectedLog.created_at)}</span>
                 </div>
+
+                {selectedLog.provider_message_id && (
+                  <div>
+                    <span className="text-gray-400">Message ID:</span>
+                    <span className="text-white ml-2 text-xs font-mono">{selectedLog.provider_message_id}</span>
+                  </div>
+                )}
               </div>
             </div>
 

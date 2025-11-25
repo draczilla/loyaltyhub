@@ -10,7 +10,9 @@ import {
   Mail,
   ArrowUp,
   ArrowDown,
-  Calendar
+  Calendar,
+  Eye,
+  Send
 } from 'lucide-react';
 
 interface AnalyticsData {
@@ -20,6 +22,10 @@ interface AnalyticsData {
   rewardsRedeemed: number;
   customerGrowth: number;
   engagementRate: number;
+  emailsSent: number;
+  emailsOpened: number;
+  emailOpenRate: number;
+  smsSent: number;
 }
 
 export default function Analytics() {
@@ -32,7 +38,11 @@ export default function Analytics() {
     campaignsSent: 0,
     rewardsRedeemed: 0,
     customerGrowth: 0,
-    engagementRate: 0
+    engagementRate: 0,
+    emailsSent: 0,
+    emailsOpened: 0,
+    emailOpenRate: 0,
+    smsSent: 0
   });
 
   useEffect(() => {
@@ -46,7 +56,13 @@ export default function Analytics() {
 
     setLoading(true);
 
-    const [customersResult, programsResult, campaignsResult] = await Promise.all([
+    const [
+      customersResult,
+      programsResult,
+      campaignsResult,
+      emailsResult,
+      smsResult
+    ] = await Promise.all([
       supabase
         .from('customers')
         .select('id', { count: 'exact' })
@@ -60,8 +76,24 @@ export default function Analytics() {
         .from('campaigns')
         .select('id', { count: 'exact' })
         .eq('business_id', business.id)
-        .eq('status', 'sent')
+        .eq('status', 'sent'),
+      supabase
+        .from('communication_logs')
+        .select('opened_at, open_count')
+        .eq('business_id', business.id)
+        .eq('type', 'email')
+        .eq('is_test_email', false),
+      supabase
+        .from('communication_logs')
+        .select('id', { count: 'exact' })
+        .eq('business_id', business.id)
+        .eq('type', 'sms')
+        .eq('is_test_email', false)
     ]);
+
+    const emailsSent = emailsResult.data?.length || 0;
+    const emailsOpened = emailsResult.data?.filter(e => e.opened_at !== null).length || 0;
+    const emailOpenRate = emailsSent > 0 ? (emailsOpened / emailsSent) * 100 : 0;
 
     setAnalytics({
       totalCustomers: customersResult.count || 0,
@@ -69,7 +101,11 @@ export default function Analytics() {
       campaignsSent: campaignsResult.count || 0,
       rewardsRedeemed: 0,
       customerGrowth: 12.5,
-      engagementRate: 68.3
+      engagementRate: 68.3,
+      emailsSent,
+      emailsOpened,
+      emailOpenRate,
+      smsSent: smsResult.count || 0
     });
 
     setLoading(false);
@@ -178,6 +214,41 @@ export default function Analytics() {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+                <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-blue-400" />
+                  Email Engagement
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="text-center">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-500/10 mb-3">
+                      <Send className="w-8 h-8 text-blue-400" />
+                    </div>
+                    <p className="text-3xl font-bold text-white mb-1">{analytics.emailsSent}</p>
+                    <p className="text-sm text-gray-400">Emails Sent</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 mb-3">
+                      <Eye className="w-8 h-8 text-green-400" />
+                    </div>
+                    <p className="text-3xl font-bold text-white mb-1">{analytics.emailsOpened}</p>
+                    <p className="text-sm text-gray-400">Emails Opened</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-orange-500/10 mb-3">
+                      <TrendingUp className="w-8 h-8 text-orange-400" />
+                    </div>
+                    <p className="text-3xl font-bold text-white mb-1">{analytics.emailOpenRate.toFixed(1)}%</p>
+                    <p className="text-sm text-gray-400">Open Rate</p>
+                  </div>
+                </div>
+                {analytics.emailsSent === 0 && (
+                  <div className="mt-6 text-center text-sm text-gray-500">
+                    <p>Send your first email to see engagement metrics</p>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

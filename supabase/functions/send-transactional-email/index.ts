@@ -463,6 +463,19 @@ Deno.serve(async (req: Request) => {
       ? body
       : convertPlainTextToHtml(body);
 
+    const trackingToken = crypto.randomUUID();
+
+    if (emailTrackingEnabled) {
+      const trackingPixelUrl = `${supabaseUrl}/functions/v1/track-email-open?token=${trackingToken}`;
+      const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" alt="" style="display:block; border:0;" />`;
+
+      if (htmlBody.includes("</body>")) {
+        htmlBody = htmlBody.replace("</body>", `${trackingPixel}</body>`);
+      } else {
+        htmlBody += trackingPixel;
+      }
+    }
+
     console.log("Sending email:", {
       useBrevo,
       useSendGrid,
@@ -470,7 +483,9 @@ Deno.serve(async (req: Request) => {
       brevoKeyPrefix: brevoApiKey?.substring(0, 10),
       fromEmail,
       fromName,
-      recipientEmail
+      recipientEmail,
+      trackingEnabled: emailTrackingEnabled,
+      hasTrackingToken: !!trackingToken
     });
 
     const sendResult = useBrevo
@@ -507,7 +522,7 @@ Deno.serve(async (req: Request) => {
           content: body,
           status: sendResult.success ? "sent" : "failed",
           error_message: sendResult.error || null,
-          tracking_token: null,
+          tracking_token: emailTrackingEnabled ? trackingToken : null,
           provider: useBrevo ? "brevo" : "sendgrid",
           provider_message_id: sendResult.messageId || null,
           is_test_email: isTestEmail || false,
@@ -516,6 +531,7 @@ Deno.serve(async (req: Request) => {
             recipient_name: recipientName,
             from_email: fromEmail,
             from_name: fromName,
+            tracking_enabled: emailTrackingEnabled,
           },
         });
 
