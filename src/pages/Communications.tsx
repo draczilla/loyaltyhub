@@ -96,10 +96,15 @@ export default function Communications() {
   }, [searchQuery, filterType, filterStatus, showTestEmails, logs]);
 
   const loadCommunicationLogs = async () => {
-    if (!business) return;
+    if (!business) {
+      console.warn('Cannot load communication logs: business is null');
+      return;
+    }
 
     setLoading(true);
+    console.log('=== COMMUNICATIONS PAGE DEBUG ===');
     console.log('Loading communication logs for business:', business.id);
+    console.log('Business object:', business);
 
     const { data, error } = await supabase
       .from('communication_logs')
@@ -117,16 +122,20 @@ export default function Communications() {
     }
 
     if (data) {
-      console.log(`Loaded ${data.length} communication logs`);
-      console.log('Sample log entry:', data[0]);
+      console.log(`✅ Loaded ${data.length} communication logs`);
+      if (data.length > 0) {
+        console.log('Sample log entry:', data[0]);
+        console.log('All types:', data.map(l => l.type).join(', '));
+      }
       setLogs(data as any);
       setFilteredLogs(data as any);
     } else {
-      console.warn('No communication logs returned');
+      console.warn('⚠️ No communication logs returned (data is null)');
       setLogs([]);
       setFilteredLogs([]);
     }
 
+    console.log('=== END DEBUG ===');
     setLoading(false);
   };
 
