@@ -329,7 +329,10 @@ export default function Dashboard() {
               <p className="text-sm text-gray-500 mt-2">Loyalty programs</p>
             </div>
 
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <button
+              onClick={() => navigate('/communications')}
+              className="bg-zinc-900 border border-zinc-800 hover:border-orange-500 rounded-xl p-6 text-left transition-all cursor-pointer"
+            >
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 bg-orange-500/10 rounded-lg flex items-center justify-center">
                   <Mail className="w-6 h-6 text-orange-400" />
@@ -338,7 +341,7 @@ export default function Dashboard() {
               <h3 className="text-gray-400 text-sm mb-1">Email Usage</h3>
               <p className="text-3xl font-bold text-white">{stats.emailsSent}</p>
               <p className="text-sm text-gray-500 mt-2">This month</p>
-            </div>
+            </button>
 
             <button
               onClick={() => setShowSmsLogsModal(true)}
