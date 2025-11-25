@@ -181,10 +181,15 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <div className="px-3 py-1 bg-orange-500/10 border border-orange-500/20 rounded-lg">
-                  <span className="text-orange-400 text-sm font-medium">
-                    {business?.subscription_status === 'trial' ? 'Trial' : business?.subscription_status}
-                  </span>
+                <div className="text-right">
+                  <div className="px-3 py-1 bg-orange-500/10 border border-orange-500/20 rounded-lg mb-1">
+                    <span className="text-orange-400 text-sm font-medium">
+                      {business?.subscription_status === 'trial' ? 'Trial' : business?.subscription_status}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-400">
+                    <span className="text-white font-semibold">{business?.credits_remaining || 0}</span> credits
+                  </div>
                 </div>
               </div>
             </div>
