@@ -779,6 +779,20 @@ export default function CompanyProfile() {
                           Credits can be used for SMS and email communications. Both in direct messages and for campaigns.
                         </p>
                       )}
+                      {creditsEligibility.eligible && (
+                        <div className="mt-3 pt-3 border-t border-zinc-700 flex items-end justify-between">
+                          <div className="flex-1"></div>
+                          <div className="flex flex-col items-end gap-2">
+                            <p className="text-sm text-gray-400">Need more credits?</p>
+                            <button
+                              onClick={() => window.location.href = '/subscription'}
+                              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm transition"
+                            >
+                              Upgrade Plan
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
