@@ -135,31 +135,40 @@ export default function Dashboard() {
 
   const calculateCustomerGrowth = (customers: Array<{ created_at: string }>) => {
     const now = new Date();
-    const monthsData: CustomerGrowthData[] = [];
+    const daysData: CustomerGrowthData[] = [];
+    const totalDays = 30;
+    const groupSize = 5; // Group every 5 days
 
-    for (let i = 5; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59);
+    for (let i = totalDays - 1; i >= 0; i -= groupSize) {
+      const endDate = new Date(now);
+      endDate.setDate(now.getDate() - i);
+      endDate.setHours(23, 59, 59, 999);
 
-      const customersUpToMonth = customers.filter(
-        c => new Date(c.created_at) <= monthEnd
+      const startDate = new Date(endDate);
+      startDate.setDate(endDate.getDate() - groupSize + 1);
+      startDate.setHours(0, 0, 0, 0);
+
+      const customersUpToDate = customers.filter(
+        c => new Date(c.created_at) <= endDate
       ).length;
 
-      const previousMonthCustomers = monthsData.length > 0 ? monthsData[monthsData.length - 1].customers : 0;
-      const growth = customersUpToMonth - previousMonthCustomers;
-      const growthPercentage = previousMonthCustomers > 0
-        ? Math.round((growth / previousMonthCustomers) * 100)
-        : customersUpToMonth > 0 ? 100 : 0;
+      const previousPeriodCustomers = daysData.length > 0 ? daysData[daysData.length - 1].customers : 0;
+      const growth = customersUpToDate - previousPeriodCustomers;
+      const growthPercentage = previousPeriodCustomers > 0
+        ? Math.round((growth / previousPeriodCustomers) * 100)
+        : customersUpToDate > 0 ? 100 : 0;
 
-      monthsData.push({
-        month: date.toLocaleDateString('en-US', { month: 'short' }),
-        customers: customersUpToMonth,
+      const dayLabel = endDate.getDate().toString();
+
+      daysData.push({
+        month: dayLabel,
+        customers: customersUpToDate,
         growth,
         growthPercentage,
       });
     }
 
-    return monthsData;
+    return daysData;
   };
 
   const calculateDaysRemaining = () => {
@@ -399,7 +408,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white">Customer Growth</h2>
-                <p className="text-sm text-gray-400">Total customers over the last 6 months</p>
+                <p className="text-sm text-gray-400">Total customers over the last 30 days</p>
               </div>
             </div>
 
@@ -468,7 +477,7 @@ export default function Dashboard() {
                         : customerGrowth[customerGrowth.length - 1].customers - customerGrowth[0].customers} customers
                     </span>
                   </div>
-                  <div className="text-gray-500">Last 6 months</div>
+                  <div className="text-gray-500">Last 30 days</div>
                 </div>
               </div>
             )}
