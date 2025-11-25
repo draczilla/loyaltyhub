@@ -537,6 +537,10 @@ Deno.serve(async (req: Request) => {
 
       if (logError) {
         console.error("Error logging email:", logError);
+        console.error("Failed to create communication log for business:", resolvedBusinessId);
+      } else {
+        console.log("Successfully created communication log for email to:", recipientEmail);
+        console.log("Business ID:", resolvedBusinessId, "Customer ID:", customerId || "none");
       }
 
       if (sendResult.success && isTestEmail) {

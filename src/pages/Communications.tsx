@@ -99,6 +99,8 @@ export default function Communications() {
     if (!business) return;
 
     setLoading(true);
+    console.log('Loading communication logs for business:', business.id);
+
     const { data, error } = await supabase
       .from('communication_logs')
       .select(`
@@ -109,10 +111,22 @@ export default function Communications() {
       .order('created_at', { ascending: false })
       .limit(500);
 
-    if (!error && data) {
+    if (error) {
+      console.error('Error loading communication logs:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+    }
+
+    if (data) {
+      console.log(`Loaded ${data.length} communication logs`);
+      console.log('Sample log entry:', data[0]);
       setLogs(data as any);
       setFilteredLogs(data as any);
+    } else {
+      console.warn('No communication logs returned');
+      setLogs([]);
+      setFilteredLogs([]);
     }
+
     setLoading(false);
   };
 
@@ -257,6 +271,15 @@ export default function Communications() {
                   ? 'Send your first email or SMS to see communication history'
                   : 'No logs match your current filters'}
               </p>
+              {logs.length === 0 && (
+                <div className="mt-6 p-4 bg-zinc-900 border border-zinc-800 rounded-lg max-w-md mx-auto text-left">
+                  <p className="text-xs text-gray-400 mb-2">Debug Info:</p>
+                  <ul className="text-xs text-gray-500 space-y-1">
+                    <li>Business ID: {business?.id}</li>
+                    <li>Check browser console for detailed logs</li>
+                  </ul>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
@@ -313,10 +336,12 @@ export default function Communications() {
                             <User className="w-3 h-3" />
                             {log.is_test_email
                               ? (log.metadata?.recipient_email || 'Test Recipient')
-                              : ([log.customer?.first_name, log.customer?.last_name].filter(Boolean).join(' ') ||
-                                log.customer?.email ||
-                                log.customer?.phone ||
-                                'Unknown')}
+                              : (log.customer
+                                ? ([log.customer?.first_name, log.customer?.last_name].filter(Boolean).join(' ') ||
+                                   log.customer?.email ||
+                                   log.customer?.phone ||
+                                   'Unknown')
+                                : (log.metadata?.recipient_email || log.metadata?.recipient_name || 'Direct Email'))}
                           </span>
                           <span>{formatDate(log.created_at)}</span>
                           {log.provider && (
@@ -363,11 +388,13 @@ export default function Communications() {
 
               <div className="space-y-3 text-sm">
                 <div>
-                  <span className="text-gray-400">Customer:</span>
+                  <span className="text-gray-400">{selectedLog.customer ? 'Customer' : 'Recipient'}:</span>
                   <span className="text-white ml-2">
-                    {[selectedLog.customer.first_name, selectedLog.customer.last_name].filter(Boolean).join(' ') ||
-                      selectedLog.customer.email ||
-                      selectedLog.customer.phone}
+                    {selectedLog.customer
+                      ? ([selectedLog.customer.first_name, selectedLog.customer.last_name].filter(Boolean).join(' ') ||
+                         selectedLog.customer.email ||
+                         selectedLog.customer.phone)
+                      : (selectedLog.metadata?.recipient_email || selectedLog.metadata?.recipient_name || 'Unknown')}
                   </span>
                 </div>
 
