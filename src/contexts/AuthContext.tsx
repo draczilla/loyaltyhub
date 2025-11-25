@@ -47,6 +47,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
+  refreshBusiness: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -578,6 +579,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithGoogle,
         signOut,
         resetPassword,
+        refreshBusiness: () => user?.id && loadBusiness(user.id),
       }}
     >
       {children}

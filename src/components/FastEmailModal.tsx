@@ -121,6 +121,7 @@ export default function FastEmailModal({
         body,
         recipientEmail: customer.email,
         recipientName: [customer.first_name, customer.last_name].filter(Boolean).join(' ') || undefined,
+        isTestEmail: false,
       };
 
       console.log('Fast Email - Sending payload:', payload);

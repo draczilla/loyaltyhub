@@ -25,7 +25,7 @@ interface Customer {
 }
 
 export default function Customers() {
-  const { business } = useAuth();
+  const { business, refreshBusiness } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -112,6 +112,8 @@ export default function Customers() {
     setShowEmailModal(false);
     setShowSmsModal(false);
     setSelectedCustomer(null);
+    // Refresh business data to update credit balance
+    refreshBusiness();
   };
 
   const handleSyncToBrevo = async (customer: Customer) => {
