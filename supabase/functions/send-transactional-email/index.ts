@@ -251,35 +251,46 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      console.log("Looking up business with ID:", businessId);
+      console.log("Authenticated user ID:", user.id);
+
       let { data: businessData, error: businessError } = await supabase
         .from("businesses")
         .select("id, tier_id, usage_email_monthly, email_tracking_enabled, tenant_id")
         .eq("id", businessId)
         .maybeSingle();
 
+      console.log("Direct business lookup result:", { businessData, businessError });
+
       if (businessError || !businessData) {
         console.log("Direct business lookup failed, checking if user is tenant member...");
 
-        const { data: memberData } = await supabase
+        const { data: memberData, error: memberError } = await supabase
           .from("tenant_members")
           .select("tenant_id")
           .eq("user_id", businessId)
           .eq("status", "active")
           .maybeSingle();
 
+        console.log("Tenant member lookup result:", { memberData, memberError });
+
         if (memberData?.tenant_id) {
-          const { data: tenantData } = await supabase
+          const { data: tenantData, error: tenantError } = await supabase
             .from("tenants")
             .select("admin_user_id")
             .eq("id", memberData.tenant_id)
             .maybeSingle();
 
+          console.log("Tenant lookup result:", { tenantData, tenantError });
+
           if (tenantData?.admin_user_id) {
-            const { data: adminBusinessData } = await supabase
+            const { data: adminBusinessData, error: adminBusinessError } = await supabase
               .from("businesses")
               .select("id, tier_id, usage_email_monthly, email_tracking_enabled, tenant_id")
               .eq("id", tenantData.admin_user_id)
               .maybeSingle();
+
+            console.log("Admin business lookup result:", { adminBusinessData, adminBusinessError });
 
             if (adminBusinessData) {
               businessData = adminBusinessData;
@@ -291,8 +302,19 @@ Deno.serve(async (req: Request) => {
         }
 
         if (!businessData) {
+          console.error("Business not found after all lookup attempts:", {
+            businessId,
+            userId: user.id,
+            businessError,
+            memberData
+          });
           return new Response(
-            JSON.stringify({ error: "Business not found" }),
+            JSON.stringify({
+              error: "Business not found",
+              details: "Unable to find business record or tenant membership. Please contact support.",
+              businessId,
+              userId: user.id
+            }),
             {
               status: 404,
               headers: { ...corsHeaders, "Content-Type": "application/json" },

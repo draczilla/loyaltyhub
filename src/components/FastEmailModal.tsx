@@ -88,7 +88,25 @@ export default function FastEmailModal({
         throw new Error('Not authenticated');
       }
 
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('Fast Email - Current user:', user?.id);
+      console.log('Fast Email - Business ID being sent:', businessId);
+      console.log('Fast Email - Customer:', { id: customer.id, email: customer.email });
+
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-transactional-email`;
+
+      const payload = {
+        businessId,
+        customerId: customer.id,
+        templateId: selectedTemplate.id,
+        templateName: selectedTemplate.name,
+        subject,
+        body,
+        recipientEmail: customer.email,
+        recipientName: [customer.first_name, customer.last_name].filter(Boolean).join(' ') || undefined,
+      };
+
+      console.log('Fast Email - Sending payload:', payload);
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -96,22 +114,18 @@ export default function FastEmailModal({
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          businessId,
-          customerId: customer.id,
-          templateId: selectedTemplate.id,
-          templateName: selectedTemplate.name,
-          subject,
-          body,
-          recipientEmail: customer.email,
-          recipientName: [customer.first_name, customer.last_name].filter(Boolean).join(' ') || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();
 
+      console.log('Fast Email - Response:', { status: response.status, result });
+
       if (!response.ok || !result.success) {
-        throw new Error(result.error || 'Failed to send email');
+        const errorMsg = result.details
+          ? `${result.error}: ${result.details}`
+          : result.error || 'Failed to send email';
+        throw new Error(errorMsg);
       }
 
       setSuccess(true);
@@ -120,7 +134,9 @@ export default function FastEmailModal({
         onClose();
       }, 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send email');
+      console.error('Fast Email - Error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send email';
+      setError(errorMessage);
       setSending(false);
     }
   };
