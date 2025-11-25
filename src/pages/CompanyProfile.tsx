@@ -739,7 +739,17 @@ export default function CompanyProfile() {
                 <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-medium text-white">Communication Credits</h3>
-                    <span className="text-2xl font-bold text-orange-400">{business?.credits_remaining || 0}</span>
+                    <span className={`text-2xl font-bold ${
+                      (() => {
+                        const remaining = business?.credits_remaining || 0;
+                        const maxCredits = creditsEligibility?.credits_to_grant || 0;
+                        if (maxCredits === 0) return 'text-green-400';
+                        const percentage = (remaining / maxCredits) * 100;
+                        if (percentage < 10) return 'text-red-400';
+                        if (percentage < 25) return 'text-orange-400';
+                        return 'text-green-400';
+                      })()
+                    }`}>{business?.credits_remaining || 0}</span>
                   </div>
                   {creditsEligibility && (
                     <div className="space-y-2">
@@ -766,7 +776,7 @@ export default function CompanyProfile() {
                       )}
                       {business?.email_verified && business?.phone_verified && creditsEligibility.eligible && (
                         <p className="text-xs text-gray-500">
-                          Credits will be used for SMS and email communications
+                          Credits can be used for SMS and email communications. Both in direct messages and for campaigns.
                         </p>
                       )}
                     </div>
