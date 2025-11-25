@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Gift, Award, Ticket, Percent, Sparkles } from 'lucide-react';
+import { X, Gift, Award, Ticket, Percent, Sparkles, MessageSquare } from 'lucide-react';
 
 interface CreateProgramModalProps {
   open: boolean;
@@ -9,7 +9,7 @@ interface CreateProgramModalProps {
 
 export interface ProgramFormData {
   name: string;
-  type: 'points' | 'stamp_card' | 'rebate_code' | 'discount' | 'free_item';
+  type: 'points' | 'stamp_card' | 'rebate_code' | 'discount' | 'free_item' | 'sms_reminder';
   config: Record<string, any>;
 }
 
@@ -48,6 +48,13 @@ const programTypes = [
     icon: Gift,
     description: 'Reward customers with complimentary products or services',
     color: 'pink'
+  },
+  {
+    type: 'sms_reminder' as const,
+    label: 'SMS Reminder',
+    icon: MessageSquare,
+    description: 'Send automated SMS reminders for appointments or events',
+    color: 'teal'
   }
 ];
 
@@ -56,7 +63,8 @@ const colorClasses: Record<string, string> = {
   blue: 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20',
   green: 'bg-green-500/10 border-green-500/20 text-green-400 hover:bg-green-500/20',
   purple: 'bg-purple-500/10 border-purple-500/20 text-purple-400 hover:bg-purple-500/20',
-  pink: 'bg-pink-500/10 border-pink-500/20 text-pink-400 hover:bg-pink-500/20'
+  pink: 'bg-pink-500/10 border-pink-500/20 text-pink-400 hover:bg-pink-500/20',
+  teal: 'bg-teal-500/10 border-teal-500/20 text-teal-400 hover:bg-teal-500/20'
 };
 
 export default function CreateProgramModal({ open, onClose, onSubmit }: CreateProgramModalProps) {
@@ -114,6 +122,15 @@ export default function CreateProgramModal({ open, onClose, onSubmit }: CreatePr
           requiredPurchases: 5,
           recurring: true,
           validDays: 30
+        });
+        break;
+      case 'sms_reminder':
+        setConfig({
+          reminderType: 'appointment',
+          advanceNoticeDays: 1,
+          reminderTime: '10:00',
+          messageTemplate: 'Hi {name}, this is a reminder about your {type} on {date} at {time}.',
+          allowCustomerOptOut: true
         });
         break;
     }
@@ -495,6 +512,79 @@ export default function CreateProgramModal({ open, onClose, onSubmit }: CreatePr
                         className="w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-orange-500 focus:ring-orange-500"
                       />
                       Recurring Reward (resets after claimed)
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {selectedType === 'sms_reminder' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Reminder Type
+                    </label>
+                    <select
+                      value={config.reminderType}
+                      onChange={(e) => updateConfig('reminderType', e.target.value)}
+                      className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500"
+                    >
+                      <option value="appointment">Appointment</option>
+                      <option value="event">Event</option>
+                      <option value="booking">Booking</option>
+                      <option value="reservation">Reservation</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Send Reminder (Days Before)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="30"
+                        value={config.advanceNoticeDays}
+                        onChange={(e) => updateConfig('advanceNoticeDays', parseInt(e.target.value))}
+                        className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">0 = same day reminder</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Reminder Time
+                      </label>
+                      <input
+                        type="time"
+                        value={config.reminderTime}
+                        onChange={(e) => updateConfig('reminderTime', e.target.value)}
+                        className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Message Template
+                    </label>
+                    <textarea
+                      value={config.messageTemplate}
+                      onChange={(e) => updateConfig('messageTemplate', e.target.value)}
+                      placeholder="Use {name}, {type}, {date}, {time} as placeholders"
+                      rows={4}
+                      className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Available placeholders: {'{name}'}, {'{type}'}, {'{date}'}, {'{time}'}
+                    </p>
+                  </div>
+                  <div className="flex items-center">
+                    <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={config.allowCustomerOptOut}
+                        onChange={(e) => updateConfig('allowCustomerOptOut', e.target.checked)}
+                        className="w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-orange-500 focus:ring-orange-500"
+                      />
+                      Allow customers to opt-out of reminders
                     </label>
                   </div>
                 </div>
