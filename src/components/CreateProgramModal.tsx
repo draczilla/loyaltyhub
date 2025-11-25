@@ -51,7 +51,7 @@ const programTypes = [
   },
   {
     type: 'sms_reminder' as const,
-    label: 'SMS Reminder',
+    label: 'SMS Enrollment',
     icon: MessageSquare,
     description: 'Send automated SMS reminders for appointments or events',
     color: 'teal'
