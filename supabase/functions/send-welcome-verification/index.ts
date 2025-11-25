@@ -169,6 +169,9 @@ Deno.serve(async (req: Request) => {
       </div>
     `;
 
+    const fromEmail = Deno.env.get("EMAIL_FROM") || "noreply@loyaltyhub.no";
+    const fromName = Deno.env.get("EMAIL_FROM_NAME") || "LoyaltyHub";
+
     const brevoResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: {
@@ -177,8 +180,8 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         sender: {
-          name: "LoyaltyHub",
-          email: "noreply@loyaltyhub.no",
+          name: fromName,
+          email: fromEmail,
         },
         to: [
           {

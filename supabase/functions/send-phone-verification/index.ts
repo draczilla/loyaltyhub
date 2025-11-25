@@ -141,6 +141,8 @@ Deno.serve(async (req: Request) => {
 
     const smsMessage = `${companyName}: Complete your account setup by verifying your phone. Click: ${verificationUrl} (Expires in 1 hour)`;
 
+    const smsSender = Deno.env.get("BREVO_SMS_SENDER") || Deno.env.get("EMAIL_FROM_NAME") || "LoyaltyHub";
+
     const brevoResponse = await fetch("https://api.brevo.com/v3/transactionalSMS/sms", {
       method: "POST",
       headers: {
@@ -149,7 +151,7 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         type: "transactional",
-        sender: "AdaptIQ",
+        sender: smsSender,
         recipient: phone,
         content: smsMessage,
       }),

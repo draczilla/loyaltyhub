@@ -317,8 +317,8 @@ Deno.serve(async (req: Request) => {
     }
 
     const platformSendGridKey = Deno.env.get("SENDGRID_API_KEY");
-    const platformFromEmail = Deno.env.get("SENDGRID_FROM_EMAIL") || "noreply@loyaltyhub.com";
-    const platformFromName = Deno.env.get("SENDGRID_FROM_NAME") || "LoyaltyHub";
+    const platformFromEmail = Deno.env.get("EMAIL_FROM") || Deno.env.get("SENDGRID_FROM_EMAIL") || "noreply@loyaltyhub.com";
+    const platformFromName = Deno.env.get("EMAIL_FROM_NAME") || Deno.env.get("SENDGRID_FROM_NAME") || "LoyaltyHub";
 
     const sendgridApiKey = emailConfig.sendgridApiKey || platformSendGridKey;
     const fromEmail = emailConfig.fromEmail || platformFromEmail;
