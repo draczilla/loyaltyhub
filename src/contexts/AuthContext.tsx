@@ -24,6 +24,15 @@ interface Business {
   phone_verified: boolean;
   onboarding_status: string;
   onboarding_completed_at: string | null;
+  vat_number: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state_province: string | null;
+  postal_code: string | null;
+  country: string | null;
+  contact_phone: string | null;
+  website: string | null;
 }
 
 interface Tenant {
@@ -33,6 +42,15 @@ interface Tenant {
   primary_color: string;
   admin_user_id: string;
   created_at: string;
+  vat_number: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state_province: string | null;
+  postal_code: string | null;
+  country: string | null;
+  contact_phone: string | null;
+  website: string | null;
 }
 
 interface AuthContextType {

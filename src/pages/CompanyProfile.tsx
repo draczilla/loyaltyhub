@@ -3,10 +3,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { detectCountryDialCode, getAllCountries, getDialCode } from '../lib/countryCode';
 import Sidebar from '../components/Sidebar';
+import LogoUpload from '../components/LogoUpload';
 import {
   Menu, Building2, Users, Mail, AlertCircle, Check,
   UserPlus, Trash2, RefreshCw, XCircle, Crown, User,
-  CheckCircle, Shield, Smartphone, Loader, ChevronDown, Edit2, X, Save
+  CheckCircle, Shield, Smartphone, Loader, ChevronDown, Edit2, X, Save,
+  MapPin, Phone, Globe
 } from 'lucide-react';
 
 interface TenantMember {
@@ -57,7 +59,19 @@ export default function CompanyProfile() {
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const [creditsEligibility, setCreditsEligibility] = useState<any>(null);
   const [isEditingCompanyInfo, setIsEditingCompanyInfo] = useState(false);
-  const [companyInfoForm, setCompanyInfoForm] = useState({ company_name: '', vat_number: '' });
+  const [companyInfoForm, setCompanyInfoForm] = useState({
+    company_name: '',
+    vat_number: '',
+    address_line1: '',
+    address_line2: '',
+    city: '',
+    state_province: '',
+    postal_code: '',
+    country: '',
+    contact_phone: '',
+    website: '',
+    logo_url: null as string | null
+  });
   const [savingCompanyInfo, setSavingCompanyInfo] = useState(false);
 
   useEffect(() => {
@@ -273,12 +287,29 @@ export default function CompanyProfile() {
     setSuccess('');
 
     try {
+      // Validate website URL if provided
+      if (companyInfoForm.website && companyInfoForm.website.trim()) {
+        const websiteValue = companyInfoForm.website.trim();
+        if (!websiteValue.startsWith('http://') && !websiteValue.startsWith('https://')) {
+          throw new Error('Website URL must start with http:// or https://');
+        }
+      }
+
       // Update tenant with new company info
       const { error: tenantError } = await supabase
         .from('tenants')
         .update({
           company_name: companyInfoForm.company_name.trim(),
           vat_number: companyInfoForm.vat_number.trim() || null,
+          address_line1: companyInfoForm.address_line1.trim() || null,
+          address_line2: companyInfoForm.address_line2.trim() || null,
+          city: companyInfoForm.city.trim() || null,
+          state_province: companyInfoForm.state_province.trim() || null,
+          postal_code: companyInfoForm.postal_code.trim() || null,
+          country: companyInfoForm.country.trim() || null,
+          contact_phone: companyInfoForm.contact_phone.trim() || null,
+          website: companyInfoForm.website.trim() || null,
+          logo_url: companyInfoForm.logo_url,
         })
         .eq('id', tenant.id);
 
@@ -291,6 +322,15 @@ export default function CompanyProfile() {
           .update({
             company_name: companyInfoForm.company_name.trim(),
             vat_number: companyInfoForm.vat_number.trim() || null,
+            address_line1: companyInfoForm.address_line1.trim() || null,
+            address_line2: companyInfoForm.address_line2.trim() || null,
+            city: companyInfoForm.city.trim() || null,
+            state_province: companyInfoForm.state_province.trim() || null,
+            postal_code: companyInfoForm.postal_code.trim() || null,
+            country: companyInfoForm.country.trim() || null,
+            contact_phone: companyInfoForm.contact_phone.trim() || null,
+            website: companyInfoForm.website.trim() || null,
+            logo_url: companyInfoForm.logo_url,
           })
           .eq('id', business.id);
 
@@ -856,7 +896,16 @@ export default function CompanyProfile() {
                       onClick={() => {
                         setCompanyInfoForm({
                           company_name: tenant?.company_name || business?.company_name || '',
-                          vat_number: tenant?.vat_number || business?.vat_number || ''
+                          vat_number: tenant?.vat_number || business?.vat_number || '',
+                          address_line1: tenant?.address_line1 || business?.address_line1 || '',
+                          address_line2: tenant?.address_line2 || business?.address_line2 || '',
+                          city: tenant?.city || business?.city || '',
+                          state_province: tenant?.state_province || business?.state_province || '',
+                          postal_code: tenant?.postal_code || business?.postal_code || '',
+                          country: tenant?.country || business?.country || '',
+                          contact_phone: tenant?.contact_phone || business?.contact_phone || '',
+                          website: tenant?.website || business?.website || '',
+                          logo_url: tenant?.logo_url || business?.logo_url || null
                         });
                         setIsEditingCompanyInfo(true);
                       }}
@@ -871,7 +920,19 @@ export default function CompanyProfile() {
                       <button
                         onClick={() => {
                           setIsEditingCompanyInfo(false);
-                          setCompanyInfoForm({ company_name: '', vat_number: '' });
+                          setCompanyInfoForm({
+                            company_name: '',
+                            vat_number: '',
+                            address_line1: '',
+                            address_line2: '',
+                            city: '',
+                            state_province: '',
+                            postal_code: '',
+                            country: '',
+                            contact_phone: '',
+                            website: '',
+                            logo_url: null
+                          });
                         }}
                         className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition text-sm"
                         disabled={savingCompanyInfo}
@@ -894,46 +955,226 @@ export default function CompanyProfile() {
                     </div>
                   )}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Company Name</label>
-                    {isEditingCompanyInfo ? (
-                      <input
-                        type="text"
-                        value={companyInfoForm.company_name}
-                        onChange={(e) => setCompanyInfoForm({ ...companyInfoForm, company_name: e.target.value })}
-                        className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500"
-                        placeholder="Enter company name"
+                <div className="space-y-6">
+                  {/* Logo Upload - Only in edit mode */}
+                  {isEditingCompanyInfo && business && (
+                    <div className="pb-6 border-b border-zinc-800">
+                      <LogoUpload
+                        currentLogoUrl={companyInfoForm.logo_url}
+                        onLogoUpdate={(url) => setCompanyInfoForm({ ...companyInfoForm, logo_url: url })}
+                        businessId={business.id}
                       />
-                    ) : (
-                      <p className="text-white">{tenant?.company_name || business?.company_name}</p>
-                    )}
-                  </div>
+                    </div>
+                  )}
+
+                  {/* Basic Information */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">VAT Number</label>
-                    {isEditingCompanyInfo ? (
-                      <input
-                        type="text"
-                        value={companyInfoForm.vat_number}
-                        onChange={(e) => setCompanyInfoForm({ ...companyInfoForm, vat_number: e.target.value })}
-                        className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500"
-                        placeholder="Enter VAT number (optional)"
-                      />
-                    ) : (
-                      <p className="text-white">{tenant?.vat_number || business?.vat_number || 'Not provided'}</p>
-                    )}
+                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <Building2 className="w-5 h-5 text-orange-400" />
+                      Basic Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Company Name</label>
+                        {isEditingCompanyInfo ? (
+                          <input
+                            type="text"
+                            value={companyInfoForm.company_name}
+                            onChange={(e) => setCompanyInfoForm({ ...companyInfoForm, company_name: e.target.value })}
+                            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500"
+                            placeholder="Enter company name"
+                          />
+                        ) : (
+                          <p className="text-white">{tenant?.company_name || business?.company_name}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">VAT Number</label>
+                        {isEditingCompanyInfo ? (
+                          <input
+                            type="text"
+                            value={companyInfoForm.vat_number}
+                            onChange={(e) => setCompanyInfoForm({ ...companyInfoForm, vat_number: e.target.value })}
+                            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500"
+                            placeholder="Enter VAT number (optional)"
+                          />
+                        ) : (
+                          <p className="text-white">{tenant?.vat_number || business?.vat_number || 'Not provided'}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Admin Email</label>
+                        <p className="text-white">{business?.email}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Subscription</label>
+                        <p className="text-white capitalize">{business?.subscription_status || 'N/A'}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Admin Email</label>
-                    <p className="text-white">{business?.email}</p>
+
+                  {/* Contact Information */}
+                  <div className="pt-6 border-t border-zinc-800">
+                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <Phone className="w-5 h-5 text-orange-400" />
+                      Contact Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Contact Phone</label>
+                        {isEditingCompanyInfo ? (
+                          <input
+                            type="tel"
+                            value={companyInfoForm.contact_phone}
+                            onChange={(e) => setCompanyInfoForm({ ...companyInfoForm, contact_phone: e.target.value })}
+                            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500"
+                            placeholder="+1 (555) 123-4567"
+                          />
+                        ) : tenant?.contact_phone || business?.contact_phone ? (
+                          <a href={`tel:${tenant?.contact_phone || business?.contact_phone}`} className="text-orange-400 hover:text-orange-300">
+                            {tenant?.contact_phone || business?.contact_phone}
+                          </a>
+                        ) : (
+                          <p className="text-gray-500">Not provided</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Website</label>
+                        {isEditingCompanyInfo ? (
+                          <input
+                            type="url"
+                            value={companyInfoForm.website}
+                            onChange={(e) => setCompanyInfoForm({ ...companyInfoForm, website: e.target.value })}
+                            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500"
+                            placeholder="https://www.example.com"
+                          />
+                        ) : tenant?.website || business?.website ? (
+                          <a
+                            href={tenant?.website || business?.website || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-orange-400 hover:text-orange-300 flex items-center gap-1"
+                          >
+                            <Globe className="w-4 h-4" />
+                            {tenant?.website || business?.website}
+                          </a>
+                        ) : (
+                          <p className="text-gray-500">Not provided</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Created</label>
-                    <p className="text-white">{formatDate(tenant?.created_at || '')}</p>
+
+                  {/* Address Information */}
+                  <div className="pt-6 border-t border-zinc-800">
+                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                      <MapPin className="w-5 h-5 text-orange-400" />
+                      Address
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Address Line 1</label>
+                        {isEditingCompanyInfo ? (
+                          <input
+                            type="text"
+                            value={companyInfoForm.address_line1}
+                            onChange={(e) => setCompanyInfoForm({ ...companyInfoForm, address_line1: e.target.value })}
+                            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500"
+                            placeholder="Street address"
+                          />
+                        ) : (
+                          <p className="text-white">{tenant?.address_line1 || business?.address_line1 || 'Not provided'}</p>
+                        )}
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Address Line 2</label>
+                        {isEditingCompanyInfo ? (
+                          <input
+                            type="text"
+                            value={companyInfoForm.address_line2}
+                            onChange={(e) => setCompanyInfoForm({ ...companyInfoForm, address_line2: e.target.value })}
+                            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500"
+                            placeholder="Apartment, suite, etc. (optional)"
+                          />
+                        ) : tenant?.address_line2 || business?.address_line2 ? (
+                          <p className="text-white">{tenant?.address_line2 || business?.address_line2}</p>
+                        ) : (
+                          <p className="text-gray-500">Not provided</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">City</label>
+                        {isEditingCompanyInfo ? (
+                          <input
+                            type="text"
+                            value={companyInfoForm.city}
+                            onChange={(e) => setCompanyInfoForm({ ...companyInfoForm, city: e.target.value })}
+                            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500"
+                            placeholder="City"
+                          />
+                        ) : (
+                          <p className="text-white">{tenant?.city || business?.city || 'Not provided'}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">State/Province</label>
+                        {isEditingCompanyInfo ? (
+                          <input
+                            type="text"
+                            value={companyInfoForm.state_province}
+                            onChange={(e) => setCompanyInfoForm({ ...companyInfoForm, state_province: e.target.value })}
+                            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500"
+                            placeholder="State or Province"
+                          />
+                        ) : (
+                          <p className="text-white">{tenant?.state_province || business?.state_province || 'Not provided'}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Postal Code</label>
+                        {isEditingCompanyInfo ? (
+                          <input
+                            type="text"
+                            value={companyInfoForm.postal_code}
+                            onChange={(e) => setCompanyInfoForm({ ...companyInfoForm, postal_code: e.target.value })}
+                            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500"
+                            placeholder="Postal/ZIP code"
+                          />
+                        ) : (
+                          <p className="text-white">{tenant?.postal_code || business?.postal_code || 'Not provided'}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Country</label>
+                        {isEditingCompanyInfo ? (
+                          <select
+                            value={companyInfoForm.country}
+                            onChange={(e) => setCompanyInfoForm({ ...companyInfoForm, country: e.target.value })}
+                            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500"
+                          >
+                            <option value="">Select country</option>
+                            {getAllCountries().map((country) => (
+                              <option key={country.code} value={country.name}>
+                                {country.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <p className="text-white">{tenant?.country || business?.country || 'Not provided'}</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Subscription</label>
-                    <p className="text-white capitalize">{business?.subscription_status || 'N/A'}</p>
+
+                  {/* System Information */}
+                  <div className="pt-6 border-t border-zinc-800">
+                    <h3 className="text-lg font-semibold text-white mb-4">System Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Account Created</label>
+                        <p className="text-white">{formatDate(tenant?.created_at || '')}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
