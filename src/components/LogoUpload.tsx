@@ -40,26 +40,56 @@ export default function LogoUpload({ currentLogoUrl, onLogoUpdate, businessId }:
       const fileName = `${businessId}-${Date.now()}.${fileExt}`;
       const filePath = `logos/${fileName}`;
 
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('business-assets')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
+      // Convert file to base64 for edge function upload
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onload = () => {
+          const result = reader.result as string;
+          // Remove the data URL prefix to get just the base64 data
+          const base64 = result.split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+      });
 
-      if (uploadError) throw uploadError;
+      reader.readAsDataURL(file);
+      const base64Data = await base64Promise;
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('business-assets')
-        .getPublicUrl(filePath);
+      // Get current session for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
 
-      setPreview(publicUrl);
-      onLogoUpdate(publicUrl);
+      // Upload via edge function with service role permissions
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-logo`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            filePath,
+            fileData: base64Data,
+            contentType: file.type
+          })
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to upload logo');
+      }
+
+      setPreview(result.publicUrl);
+      onLogoUpdate(result.publicUrl);
     } catch (err) {
       console.error('Upload error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to upload logo');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to upload logo';
+      setError(errorMessage);
     } finally {
       setUploading(false);
     }
