@@ -205,7 +205,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <div className="text-right">
+                <div className="text-center">
                   <div className="px-6 py-1 bg-orange-500/10 border border-orange-500/20 rounded-lg mb-1">
                     <span className="text-orange-400 text-sm font-medium">
                       {business?.subscription_status === 'trial' ? 'FREE Plan' : business?.subscription_status}
