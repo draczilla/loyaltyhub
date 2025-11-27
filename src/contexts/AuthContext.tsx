@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { logger } from '../lib/logger';
 
 interface Business {
   id: string;
@@ -113,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         updateAuthState(data, userId);
       }
     } catch (error) {
-      console.error('Background auth refresh failed:', error);
+      logger.error('Background auth refresh failed:', error);
     }
   };
 
@@ -127,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
 
       if (superAdminCheck) {
-        console.log('User is a super admin - not creating business record');
+        logger.log('User is a super admin - not creating business record');
         setBusiness(null);
         setTenant(null);
         setIsSuperAdmin(true);
@@ -138,12 +139,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
 
       if (userError) {
-        console.error('Error fetching user:', userError);
+        logger.error('Error fetching user:', userError);
         throw userError;
       }
 
       if (!user || !user.email) {
-        console.error('Cannot create business: no user email found', { user });
+        logger.error('Cannot create business: no user email found', { user });
         // Instead of returning, throw an error so we can retry
         throw new Error('User email not available');
       }

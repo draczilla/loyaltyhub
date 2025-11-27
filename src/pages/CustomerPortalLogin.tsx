@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
 import { Award, Phone, Lock, ArrowRight } from 'lucide-react';
 
 export default function CustomerPortalLogin() {
@@ -18,50 +17,29 @@ export default function CustomerPortalLogin() {
     try {
       const cleanPhone = phone.replace(/\D/g, '');
 
-      const { data, error: queryError } = await supabase
-        .from('customers')
-        .select('id, first_name, last_name, email, auth_pin, portal_enabled, business_id')
-        .eq('auth_phone', cleanPhone)
-        .maybeSingle();
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/customer-portal-login`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ phone: cleanPhone, pin })
+        }
+      );
 
-      if (queryError) {
-        throw queryError;
-      }
+      const result = await response.json();
 
-      if (!data) {
-        setError('Phone number not found. Please check and try again.');
+      if (!response.ok || !result.success) {
+        setError(result.error || 'Login failed. Please try again.');
         setLoading(false);
         return;
       }
 
-      if (!data.portal_enabled) {
-        setError('Portal access is disabled. Please contact the business.');
-        setLoading(false);
-        return;
-      }
-
-      if (data.auth_pin !== pin) {
-        setError('Invalid PIN. Please try again.');
-        setLoading(false);
-        return;
-      }
-
-      await supabase
-        .from('customers')
-        .update({ last_login_at: new Date().toISOString() })
-        .eq('id', data.id);
-
-      sessionStorage.setItem('customer_session', JSON.stringify({
-        customerId: data.id,
-        businessId: data.business_id,
-        name: `${data.first_name} ${data.last_name}`,
-        phone: cleanPhone
-      }));
-
+      sessionStorage.setItem('customer_session', JSON.stringify(result.session));
       navigate('/customer/dashboard');
     } catch (err: any) {
-      console.error('Login error:', err);
-      setError(err.message || 'Failed to log in. Please try again.');
+      setError('An error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
