@@ -8,6 +8,9 @@ import SuperAdminProtectedRoute from './components/SuperAdminProtectedRoute';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
+import Cookies from './pages/Cookies';
 
 // Lazy load all other pages
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -236,6 +239,9 @@ function App() {
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/verify-phone-setup" element={<CompanyProfile />} />
         <Route path="/verify-phone" element={<VerifyPhone />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/cookies" element={<Cookies />} />
       </Routes>
     </Suspense>
   );

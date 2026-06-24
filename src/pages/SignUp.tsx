@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { UserPlus, Check, Gift, CheckCircle, XCircle } from 'lucide-react';
+import { UserPlus, Check, Gift, CheckCircle, XCircle, Eye, EyeOff } from 'lucide-react';
 
 interface SubscriptionTier {
   id: string;
@@ -13,6 +13,23 @@ interface SubscriptionTier {
   price_monthly: number;
   stripe_price_id: string | null;
   features: Record<string, boolean>;
+}
+
+function passwordStrength(pwd: string): number {
+  let score = 0;
+  if (pwd.length >= 8) score++;
+  if (pwd.length >= 12) score++;
+  if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) score++;
+  if (/[0-9]/.test(pwd) || /[^A-Za-z0-9]/.test(pwd)) score++;
+  return Math.max(1, score);
+}
+
+function passwordStrengthLabel(pwd: string): string {
+  const s = passwordStrength(pwd);
+  if (s <= 1) return 'Weak — add uppercase, numbers or symbols';
+  if (s === 2) return 'Fair';
+  if (s === 3) return 'Good';
+  return 'Strong';
 }
 
 export default function SignUp() {
@@ -26,6 +43,8 @@ export default function SignUp() {
   const [tiers, setTiers] = useState<SubscriptionTier[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const { signUp, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -116,6 +135,18 @@ export default function SignUp() {
 
     if (!selectedTier) {
       setError('Please select a subscription tier');
+      setLoading(false);
+      return;
+    }
+
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      setLoading(false);
+      return;
+    }
+
+    if (!agreedToTerms) {
+      setError('Please agree to the Terms of Service and Privacy Policy to continue');
       setLoading(false);
       return;
     }
@@ -234,17 +265,50 @@ export default function SignUp() {
               <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="w-full px-4 py-3 bg-black border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
-                placeholder="••••••••"
-              />
-              <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  className="w-full px-4 py-3 pr-12 bg-black border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              {password.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4].map((level) => (
+                      <div
+                        key={level}
+                        className={`h-1 flex-1 rounded-full transition-colors ${
+                          passwordStrength(password) >= level
+                            ? level <= 1 ? 'bg-red-500' : level <= 2 ? 'bg-orange-400' : level <= 3 ? 'bg-yellow-400' : 'bg-green-400'
+                            : 'bg-zinc-700'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p className={`text-xs ${
+                    passwordStrength(password) <= 1 ? 'text-red-400' :
+                    passwordStrength(password) <= 2 ? 'text-orange-400' :
+                    passwordStrength(password) <= 3 ? 'text-yellow-400' : 'text-green-400'
+                  }`}>
+                    {passwordStrengthLabel(password)}
+                  </p>
+                </div>
+              )}
+              {!password && <p className="text-xs text-gray-500 mt-1">Minimum 8 characters</p>}
             </div>
 
             <div>
@@ -329,6 +393,25 @@ export default function SignUp() {
                 ))}
               </div>
             </div>
+
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                className="mt-1 w-4 h-4 rounded border-zinc-700 bg-black text-orange-500 focus:ring-orange-500 focus:ring-offset-0 flex-shrink-0"
+              />
+              <span className="text-sm text-gray-400 leading-relaxed">
+                I agree to the{' '}
+                <Link to="/terms" target="_blank" className="text-orange-400 hover:text-orange-300 underline">
+                  Terms of Service
+                </Link>{' '}
+                and{' '}
+                <Link to="/privacy" target="_blank" className="text-orange-400 hover:text-orange-300 underline">
+                  Privacy Policy
+                </Link>
+              </span>
+            </label>
 
             <button
               type="submit"

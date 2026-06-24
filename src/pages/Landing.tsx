@@ -1095,15 +1095,21 @@ export default function Landing() {
 
       <footer className="border-t border-zinc-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
                 <Gift className="w-5 h-5 text-white" />
               </div>
               <span className="text-white font-bold">LoyaltyHub</span>
             </div>
-            <p className="text-gray-400 text-sm">
-              © 2025 LoyaltyHub. All rights reserved.
+            <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-sm text-gray-400">
+              <a href="/terms" className="hover:text-white transition">Terms of Service</a>
+              <a href="/privacy" className="hover:text-white transition">Privacy Policy</a>
+              <a href="/cookies" className="hover:text-white transition">Cookie Policy</a>
+              <a href="mailto:support@loyaltyhub.com" className="hover:text-white transition">Support</a>
+            </div>
+            <p className="text-gray-500 text-sm">
+              © 2026 LoyaltyHub. All rights reserved.
             </p>
           </div>
         </div>
