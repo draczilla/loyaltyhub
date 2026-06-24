@@ -27,6 +27,18 @@ export default function AddCustomerModal({ onClose, onSuccess }: AddCustomerModa
     setError('');
     setLoading(true);
 
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      setError('Please enter a valid email address');
+      setLoading(false);
+      return;
+    }
+
+    if (formData.phone && !/^\+[1-9]\d{1,14}$/.test(formData.phone)) {
+      setError('Phone number must be in E.164 format (e.g., +1234567890)');
+      setLoading(false);
+      return;
+    }
+
     const { data: uniqueIdData } = await supabase.rpc('generate_unique_customer_id', {
       business_prefix: 'CUS',
     });

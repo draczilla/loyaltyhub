@@ -25,6 +25,8 @@ export default function Campaigns() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [campaignName, setCampaignName] = useState('');
   const [campaignType, setCampaignType] = useState<'email' | 'sms'>('sms');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [createError, setCreateError] = useState('');
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
@@ -107,6 +109,7 @@ export default function Campaigns() {
     if (!business || !campaignName.trim()) return;
 
     setCreating(true);
+    setCreateError('');
     const { data, error } = await supabase
       .from('campaigns')
       .insert({
@@ -121,11 +124,14 @@ export default function Campaigns() {
 
     setCreating(false);
 
-    if (!error && data) {
+    if (error) {
+      setCreateError(error.message);
+    } else if (data) {
       setCampaigns([data, ...campaigns]);
       setShowCreateModal(false);
       setCampaignName('');
       setCampaignType('sms');
+      setCreateError('');
     }
   };
 
@@ -282,11 +288,46 @@ export default function Campaigns() {
                         </p>
                         <p className="text-xs text-gray-400">Recipients</p>
                       </div>
-                      <button className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition text-sm">
-                        View Details
+                      <button
+                        onClick={() => setExpandedId(expandedId === campaign.id ? null : campaign.id)}
+                        className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition text-sm"
+                      >
+                        {expandedId === campaign.id ? 'Hide Details' : 'View Details'}
                       </button>
                     </div>
                   </div>
+                  {expandedId === campaign.id && (
+                    <div className="mt-4 pt-4 border-t border-zinc-700 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <p className="text-gray-500 mb-1">Type</p>
+                        <p className="text-white capitalize">{campaign.type}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 mb-1">Status</p>
+                        <p className="text-white capitalize">{campaign.status}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 mb-1">Recipients</p>
+                        <p className="text-white">{campaign.recipient_count}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 mb-1">Created</p>
+                        <p className="text-white">{formatDate(campaign.created_at)}</p>
+                      </div>
+                      {campaign.scheduled_for && (
+                        <div>
+                          <p className="text-gray-500 mb-1">Scheduled For</p>
+                          <p className="text-blue-400">{formatDate(campaign.scheduled_for)}</p>
+                        </div>
+                      )}
+                      {campaign.sent_at && (
+                        <div>
+                          <p className="text-gray-500 mb-1">Sent At</p>
+                          <p className="text-green-400">{formatDate(campaign.sent_at)}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -303,6 +344,11 @@ export default function Campaigns() {
             </div>
 
             <div className="p-6 space-y-6">
+              {createError && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                  <p className="text-red-400 text-sm">{createError}</p>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Campaign Name
@@ -365,6 +411,7 @@ export default function Campaigns() {
                   setShowCreateModal(false);
                   setCampaignName('');
                   setCampaignType('sms');
+                  setCreateError('');
                 }}
                 className="flex-1 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition"
               >

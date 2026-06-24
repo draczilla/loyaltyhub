@@ -94,7 +94,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsTenantAdmin(data.data?.is_tenant_admin || false);
     }
 
-    // Cache the auth state
     const cacheData = {
       user: { id: userId },
       business: data.user_type === 'business' ? data.data : null,
@@ -283,46 +282,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const RETRY_DELAY = 1000;
 
     try {
-      console.log('Loading business data for user:', userId, `(attempt ${retryCount + 1})`);
-
-      // Use the combined RPC function for better performance
       const { data, error } = await supabase.rpc('get_user_auth_data', { user_id_param: userId });
 
       if (error) {
-        console.error('Error loading auth data:', error);
+        logger.error('Error loading auth data:', error);
 
-        // If it's a network error and we haven't exceeded retries, retry
         if (error.message?.includes('Failed to fetch') && retryCount < MAX_RETRIES) {
-          console.log(`Retrying in ${RETRY_DELAY}ms...`);
           await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
           return loadBusiness(userId, retryCount + 1);
         }
 
-        // Fallback to creating business for OAuth users
         await createBusinessForOAuthUser(userId);
         return;
       }
 
       if (!data) {
-        console.warn('No auth data returned for user:', userId);
         await createBusinessForOAuthUser(userId);
         return;
       }
 
-      console.log('Auth data loaded:', data);
       updateAuthState(data, userId);
 
-      // If no user record found, create one for OAuth users
       if (data.user_type === 'none') {
-        console.log('No user record found, creating business for OAuth user');
         await createBusinessForOAuthUser(userId);
       }
     } catch (error) {
-      console.error('Exception loading business:', error);
+      logger.error('Exception loading business:', error);
 
-      // Retry on network errors
       if (error instanceof Error && error.message?.includes('Failed to fetch') && retryCount < MAX_RETRIES) {
-        console.log(`Retrying in ${RETRY_DELAY}ms...`);
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
         return loadBusiness(userId, retryCount + 1);
       }
@@ -332,7 +319,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsSuperAdmin(false);
       setIsTenantAdmin(false);
     } finally {
-      console.log('Finished loading business, setting loading to false');
       setLoading(false);
     }
   };
@@ -346,56 +332,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const initAuth = async () => {
       try {
-        // No cache or expired, fetch session
-        console.log('[AuthContext] Fetching session from Supabase');
-        const sessionStartTime = performance.now();
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        console.log(`[AuthContext] Session fetch took ${(performance.now() - sessionStartTime).toFixed(2)}ms`);
 
         if (sessionError) {
-          console.error('[AuthContext] Error fetching session:', sessionError);
+          logger.error('Error fetching session:', sessionError);
         }
 
-        if (!mounted) {
-          console.log('[AuthContext] Component unmounted, aborting');
-          return;
-        }
+        if (!mounted) return;
 
-        // Clear timeout as we got a response
         clearTimeout(timeoutId);
 
-        console.log('[AuthContext] Session:', session ? 'User logged in' : 'No session');
         setSession(session);
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          // Load fresh data
-          console.log('[AuthContext] Loading business data');
-          const businessStartTime = performance.now();
           await loadBusiness(session.user.id);
-          console.log(`[AuthContext] Business data load took ${(performance.now() - businessStartTime).toFixed(2)}ms`);
         } else {
-          // No session
-          console.log('[AuthContext] No session, clearing state');
           sessionStorage.removeItem('auth_state');
           sessionStorage.removeItem('auth_timestamp');
           setLoading(false);
         }
-        console.log(`[AuthContext] Total auth initialization took ${(performance.now() - startTime).toFixed(2)}ms`);
       } catch (error) {
-        console.error('[AuthContext] Error initializing auth:', error);
+        logger.error('Error initializing auth:', error);
         clearTimeout(timeoutId);
         if (mounted) {
-          console.log('[AuthContext] Setting loading to false due to error');
           setLoading(false);
         }
       }
     };
 
-    // Increased timeout to 5 seconds to allow for business data loading
     timeoutId = setTimeout(() => {
       if (mounted) {
-        console.error('[AuthContext] Auth initialization timeout - forcing loading to false');
+        logger.error('Auth initialization timeout - forcing loading to false');
         setLoading(false);
       }
     }, 5000);
@@ -405,7 +373,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
 
-      console.log('[AuthContext] Auth state changed:', _event);
       setSession(session);
       setUser(session?.user ?? null);
 
@@ -421,7 +388,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => {
-      console.log('[AuthContext] Cleaning up auth subscription');
       mounted = false;
       clearTimeout(timeoutId);
       subscription.unsubscribe();
@@ -429,21 +395,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string, companyName: string, tierId: string) => {
-    console.log('[AuthContext] Starting signup process');
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
     });
 
     if (authError || !authData.user) {
-      console.error('[AuthContext] Signup auth error:', authError);
+      logger.error('Signup auth error:', authError);
       return { error: authError };
     }
 
-    console.log('[AuthContext] Auth user created:', authData.user.id);
-
-    // Check if tenant already exists for this user
-    console.log('[AuthContext] Checking for existing tenant');
     const { data: existingTenant } = await supabase
       .from('tenants')
       .select('*')
@@ -452,9 +413,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let tenantToUse = existingTenant;
 
-    // Create tenant only if it doesn't exist
     if (!existingTenant) {
-      console.log('[AuthContext] Creating new tenant');
       const { data: newTenant, error: tenantError } = await supabase
         .from('tenants')
         .insert({
@@ -465,14 +424,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
 
       if (tenantError) {
-        console.error('[AuthContext] Tenant creation error:', tenantError);
+        logger.error('Tenant creation error:', tenantError);
         return { error: tenantError as any };
       }
 
-      console.log('[AuthContext] Tenant created:', newTenant.id);
       tenantToUse = newTenant;
-    } else {
-      console.log('[AuthContext] Using existing tenant:', existingTenant.id);
     }
 
     const { data: existingBusiness } = await supabase
@@ -482,13 +438,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
 
     if (!tenantToUse) {
-      console.error('[AuthContext] No tenant available');
+      logger.error('No tenant available');
       return { error: { message: 'Failed to create or find tenant' } as any };
     }
 
-    // Create business only if it doesn't exist
     if (!existingBusiness) {
-      console.log('[AuthContext] Creating business record');
       const { error: businessError } = await supabase
         .from('businesses')
         .insert({
@@ -508,14 +462,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
       if (businessError) {
-        console.error('[AuthContext] Business creation error:', businessError);
+        logger.error('Business creation error:', businessError);
         return { error: businessError as any };
       }
 
-      console.log('[AuthContext] Business created successfully');
-
-      // Create tenant member record
-      console.log('[AuthContext] Creating tenant member record');
       const { error: memberError } = await supabase
         .from('tenant_members')
         .insert({
@@ -527,24 +477,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
       if (memberError) {
-        console.error('[AuthContext] Tenant member creation error:', memberError);
-      } else {
-        console.log('[AuthContext] Tenant member created successfully');
+        logger.error('Tenant member creation error:', memberError);
       }
 
-      // Wait a moment for the database to fully commit
-      console.log('[AuthContext] Waiting for database commit...');
       await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Force a fresh load of business data
-      console.log('[AuthContext] Loading fresh business data after signup');
       await loadBusiness(authData.user.id);
     } else {
-      console.log('[AuthContext] Business already exists, loading data');
       await loadBusiness(authData.user.id);
     }
 
-    console.log('[AuthContext] Signup process completed successfully');
     return { error: null };
   };
 

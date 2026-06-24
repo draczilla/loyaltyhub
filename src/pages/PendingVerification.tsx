@@ -89,7 +89,7 @@ export default function PendingVerification() {
                   Email not received?
                 </p>
                 <p className="text-orange-400 text-xs">
-                  Please wait a few minutes. If you still don't receive it, check your spam folder or contact support at admin@adaptiq.no
+                  Please wait a few minutes. If you still don't receive it, check your spam folder or contact support.
                 </p>
               </div>
             </div>
@@ -97,9 +97,13 @@ export default function PendingVerification() {
 
           <div className="text-center text-gray-500 text-sm">
             <p>The verification link will expire in 24 hours</p>
-            {timeRemaining > 0 && (
+            {timeRemaining > 0 ? (
               <p className="mt-2">
                 You can close this window. Redirecting to login in {timeRemaining}s...
+              </p>
+            ) : (
+              <p className="mt-2 text-orange-400">
+                Ready to sign in? Use the button below.
               </p>
             )}
           </div>

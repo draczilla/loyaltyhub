@@ -186,7 +186,7 @@ export default function VerifyEmail() {
         <div className="mt-6 text-center">
           <p className="text-gray-500 text-sm">
             Need help?{' '}
-            <a href="mailto:support@yourdomain.com" className="text-orange-400 hover:text-orange-300">
+            <a href="mailto:support@loyaltyhub.com" className="text-orange-400 hover:text-orange-300">
               Contact Support
             </a>
           </p>

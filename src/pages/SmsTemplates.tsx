@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
 import VerificationGuard from '../components/VerificationGuard';
-import { Menu, MessageSquare, Plus, Edit2, Save, X, AlertCircle, Check } from 'lucide-react';
+import { Menu, MessageSquare, Plus, CreditCard as Edit2, Save, X, AlertCircle, Check } from 'lucide-react';
 
 interface SmsTemplate {
   id: string;
@@ -102,6 +102,7 @@ export default function SmsTemplates() {
           .from('sms_templates')
           .update({
             name: formData.name,
+            trigger_type: formData.trigger_type,
             message_template: formData.message_template,
             active: formData.active,
           })
@@ -325,6 +326,23 @@ export default function SmsTemplates() {
                           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                           className="w-full px-4 py-3 bg-black border border-zinc-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
                         />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Trigger Type
+                        </label>
+                        <select
+                          value={formData.trigger_type}
+                          onChange={(e) => setFormData({ ...formData, trigger_type: e.target.value as any })}
+                          className="w-full px-4 py-3 bg-black border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
+                        >
+                          <option value="welcome">Welcome Message</option>
+                          <option value="reward_earned">Reward Earned</option>
+                          <option value="points_milestone">Points Milestone</option>
+                          <option value="birthday">Birthday</option>
+                          <option value="custom">Custom</option>
+                        </select>
                       </div>
 
                       <div>

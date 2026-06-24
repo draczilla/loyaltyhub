@@ -81,6 +81,12 @@ export default function SuperAdminTestCommunications() {
       }
 
       setSuccess(`Email sent successfully! Message ID: ${result.messageId || 'N/A'}`);
+      setEmailForm({
+        recipientEmail: '',
+        recipientName: '',
+        subject: 'Test Email from LoyaltyHub',
+        body: 'This is a test email sent through LoyaltyHub\'s centralized Brevo integration. If you receive this, the integration is working correctly!',
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send email');
     } finally {
@@ -146,6 +152,7 @@ export default function SuperAdminTestCommunications() {
       }
 
       setSuccess(`SMS sent successfully via ${result.provider || 'unknown provider'}! Message ID: ${result.messageId || 'N/A'}`);
+      setSmsForm({ recipientPhone: '', message: 'This is a test SMS sent through LoyaltyHub\'s SMS integration.' });
     } catch (err) {
       console.error('SMS Test Error:', err);
       setError(err instanceof Error ? err.message : 'Failed to send SMS');

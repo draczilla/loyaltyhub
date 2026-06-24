@@ -127,7 +127,7 @@ export default function SignUp() {
       return;
     }
 
-    const { error: signUpError, user } = await signUp(email, password, companyName, selectedTier);
+    const { error: signUpError } = await signUp(email, password, companyName, selectedTier);
 
     if (signUpError) {
       setError(signUpError.message);
@@ -136,17 +136,15 @@ export default function SignUp() {
     }
 
     // If referral code is valid, create referral record
-    if (referralCode && referralValid && user) {
+    if (referralCode && referralValid) {
       try {
-        // Get the business ID for the newly created user
         const { data: business } = await supabase
           .from('businesses')
           .select('id')
-          .eq('id', user.id)
-          .single();
+          .eq('email', email)
+          .maybeSingle();
 
         if (business) {
-          // Get referrer business ID
           const { data: referrerData } = await supabase.rpc('validate_referral_code', {
             p_referral_code: referralCode
           });
@@ -154,7 +152,6 @@ export default function SignUp() {
           if (referrerData && referrerData.length > 0) {
             const referrerBusinessId = referrerData[0].referrer_business_id;
 
-            // Create referral record
             await supabase.from('referrals').insert({
               referral_code: referralCode,
               referrer_business_id: referrerBusinessId,
@@ -167,7 +164,6 @@ export default function SignUp() {
         }
       } catch (err) {
         console.error('Error creating referral record:', err);
-        // Don't fail signup if referral tracking fails
       }
     }
 

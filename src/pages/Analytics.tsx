@@ -148,13 +148,19 @@ export default function Analytics() {
     const growthData = calculateCustomerGrowth(customersResult.data || [], dateOffset);
     setCustomerGrowth(growthData);
 
+    const totalCustomers = customersResult.count || 0;
+    const previousPeriodCustomers = growthData.length >= 2 ? growthData[0].customers : 0;
+    const customerGrowthPct = previousPeriodCustomers > 0
+      ? Math.round(((totalCustomers - previousPeriodCustomers) / previousPeriodCustomers) * 100)
+      : 0;
+
     setAnalytics({
-      totalCustomers: customersResult.count || 0,
+      totalCustomers,
       activePrograms: programsResult.count || 0,
       campaignsSent: campaignsResult.count || 0,
       rewardsRedeemed: 0,
-      customerGrowth: 12.5,
-      engagementRate: 68.3,
+      customerGrowth: customerGrowthPct,
+      engagementRate: emailsSent > 0 ? Math.round((emailsOpened / emailsSent) * 100) : 0,
       emailsSent,
       emailsOpened,
       emailOpenRate,
@@ -192,10 +198,10 @@ export default function Analytics() {
     {
       label: 'Engagement Rate',
       value: `${analytics.engagementRate}%`,
-      change: 5.2,
+      change: 0,
       icon: TrendingUp,
-      color: 'text-purple-400',
-      bgColor: 'bg-purple-500/10'
+      color: 'text-blue-400',
+      bgColor: 'bg-blue-500/10'
     }
   ];
 

@@ -268,6 +268,7 @@ function QRCodeCard({
   onDelete: (id: string) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -325,8 +326,14 @@ function QRCodeCard({
             Download
           </button>
           <button
-            onClick={() => onDelete(qrCode.id)}
-            className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition"
+            onClick={async () => {
+              if (deleting) return;
+              setDeleting(true);
+              await onDelete(qrCode.id);
+              setDeleting(false);
+            }}
+            disabled={deleting}
+            className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Trash2 className="w-4 h-4" />
           </button>

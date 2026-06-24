@@ -82,30 +82,34 @@ export default function ReferralModal({ onClose }: ReferralModalProps) {
 
     setLoading(true);
 
-    const [codeResult, referralsResult, badgesResult] = await Promise.all([
-      supabase
-        .from('referral_codes')
-        .select('*')
-        .eq('business_id', business.id)
-        .single(),
-      supabase
-        .from('referrals')
-        .select('*')
-        .eq('referrer_business_id', business.id)
-        .order('created_at', { ascending: false })
-        .limit(10),
-      supabase
-        .from('referral_badges')
-        .select('*')
-        .eq('business_id', business.id)
-        .order('earned_at', { ascending: false }),
-    ]);
+    try {
+      const [codeResult, referralsResult, badgesResult] = await Promise.all([
+        supabase
+          .from('referral_codes')
+          .select('*')
+          .eq('business_id', business.id)
+          .single(),
+        supabase
+          .from('referrals')
+          .select('*')
+          .eq('referrer_business_id', business.id)
+          .order('created_at', { ascending: false })
+          .limit(10),
+        supabase
+          .from('referral_badges')
+          .select('*')
+          .eq('business_id', business.id)
+          .order('earned_at', { ascending: false }),
+      ]);
 
-    if (codeResult.data) setReferralCode(codeResult.data);
-    if (referralsResult.data) setReferrals(referralsResult.data);
-    if (badgesResult.data) setBadges(badgesResult.data);
-
-    setLoading(false);
+      if (codeResult.data) setReferralCode(codeResult.data);
+      if (referralsResult.data) setReferrals(referralsResult.data);
+      if (badgesResult.data) setBadges(badgesResult.data);
+    } catch (err) {
+      console.error('Error loading referral data:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const generateQRCode = async (url: string) => {

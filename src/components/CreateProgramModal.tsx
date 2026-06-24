@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Gift, Award, Ticket, Percent, Sparkles, MessageSquare } from 'lucide-react';
+import { X, Gift, Award, Ticket, Percent, Sparkles, MessageSquare, AlertCircle } from 'lucide-react';
 
 interface CreateProgramModalProps {
   open: boolean;
@@ -73,6 +73,7 @@ export default function CreateProgramModal({ open, onClose, onSubmit }: CreatePr
   const [programName, setProgramName] = useState('');
   const [config, setConfig] = useState<Record<string, any>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [validationError, setValidationError] = useState('');
 
   if (!open) return null;
 
@@ -139,6 +140,21 @@ export default function CreateProgramModal({ open, onClose, onSubmit }: CreatePr
   const handleSubmit = async () => {
     if (!selectedType || !programName.trim()) return;
 
+    setValidationError('');
+
+    if (selectedType === 'stamp_card' && (!config.stampsRequired || config.stampsRequired < 2)) {
+      setValidationError('Stamp card requires at least 2 stamps');
+      return;
+    }
+
+    if (selectedType === 'discount' && config.tiers) {
+      const visitCounts = config.tiers.map((t: any) => t.visits);
+      if (new Set(visitCounts).size !== visitCounts.length) {
+        setValidationError('Discount tiers must have unique visit counts');
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       await onSubmit({
@@ -148,7 +164,7 @@ export default function CreateProgramModal({ open, onClose, onSubmit }: CreatePr
       });
       handleClose();
     } catch (error) {
-      console.error('Error creating program:', error);
+      setValidationError(error instanceof Error ? error.message : 'Failed to create program');
     } finally {
       setSubmitting(false);
     }
@@ -160,6 +176,7 @@ export default function CreateProgramModal({ open, onClose, onSubmit }: CreatePr
     setProgramName('');
     setConfig({});
     setSubmitting(false);
+    setValidationError('');
     onClose();
   };
 
@@ -210,6 +227,12 @@ export default function CreateProgramModal({ open, onClose, onSubmit }: CreatePr
             </div>
           ) : (
             <div className="space-y-6">
+              {validationError && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-red-400 text-sm">{validationError}</p>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Program Name

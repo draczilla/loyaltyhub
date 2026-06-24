@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
 import CreateProgramModal, { ProgramFormData } from '../components/CreateProgramModal';
-import { Menu, Plus, Gift, Play, Pause, Archive } from 'lucide-react';
+import { Menu, Plus, Gift, Play, Pause, Archive, AlertCircle, X } from 'lucide-react';
 
 interface LoyaltyProgram {
   id: string;
@@ -39,24 +39,20 @@ export default function Programs() {
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
-    console.log('[Programs] Business context:', business);
     if (business) {
       loadPrograms();
     } else {
-      console.log('[Programs] Waiting for business context...');
       setLoading(false);
     }
   }, [business]);
 
   const loadPrograms = async () => {
     if (!business) {
-      console.log('[Programs] Cannot load programs: business is null');
       setLoading(false);
       setError('Business context not available');
       return;
     }
 
-    console.log('[Programs] Loading programs for business:', business.id);
     setLoading(true);
     setError(null);
 
@@ -66,14 +62,10 @@ export default function Programs() {
       .eq('business_id', business.id)
       .order('created_at', { ascending: false });
 
-    console.log('[Programs] Query result:', { data, error: queryError });
-
     if (queryError) {
-      console.error('[Programs] Error loading programs:', queryError);
       setError(`Failed to load programs: ${queryError.message}`);
       setPrograms([]);
     } else if (data) {
-      console.log('[Programs] Successfully loaded programs:', data.length);
       setPrograms(data);
     }
 
@@ -88,7 +80,9 @@ export default function Programs() {
       .update({ status: newStatus })
       .eq('id', programId);
 
-    if (!error) {
+    if (error) {
+      setError(`Failed to update program: ${error.message}`);
+    } else {
       loadPrograms();
     }
   };
@@ -107,7 +101,7 @@ export default function Programs() {
       });
 
     if (error) {
-      console.error('Error creating program:', error);
+      setError(`Failed to create program: ${error.message}`);
       throw error;
     }
 
@@ -148,6 +142,15 @@ export default function Programs() {
         </header>
 
         <main className="flex-1 px-4 sm:px-6 lg:px-8 py-8">
+          {error && !loading && programs.length > 0 && (
+            <div className="mb-6 bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-red-400 text-sm flex-1">{error}</p>
+              <button onClick={() => setError(null)} className="text-red-400 hover:text-red-300 transition">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>

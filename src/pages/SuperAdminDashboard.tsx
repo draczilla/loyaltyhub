@@ -55,7 +55,7 @@ export default function SuperAdminDashboard() {
     try {
       const { data, error } = await supabase
         .from('super_admins')
-        .select('id')
+        .select('id, created_at')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -65,18 +65,11 @@ export default function SuperAdminDashboard() {
 
       if (!data) return;
 
-      const enrichedAdmins = await Promise.all(
-        data.map(async (admin: any) => {
-          const { data: authData } = await supabase.auth.admin.getUserById(admin.id);
-          return {
-            id: admin.id,
-            email: authData?.user?.email || 'Unknown',
-            created_at: authData?.user?.created_at || new Date().toISOString(),
-          };
-        })
-      );
-
-      setSuperAdmins(enrichedAdmins);
+      setSuperAdmins(data.map((admin: any) => ({
+        id: admin.id,
+        email: admin.email || admin.id,
+        created_at: admin.created_at,
+      })));
     } catch (err) {
       console.error('Unexpected error loading super admins:', err);
     }
@@ -456,9 +449,6 @@ export default function SuperAdminDashboard() {
                     <thead className="bg-black/50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                          Email
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                           User ID
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
@@ -479,11 +469,8 @@ export default function SuperAdminDashboard() {
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm font-medium text-white flex items-center gap-2">
                                 <Shield className="w-4 h-4 text-red-400" />
-                                {admin.email}
+                                <span className="font-mono text-xs text-gray-300">{admin.id}</span>
                               </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-xs text-gray-400 font-mono">{admin.id}</div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-400">

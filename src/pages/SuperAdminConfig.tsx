@@ -89,6 +89,10 @@ export default function SuperAdminConfig() {
   };
 
   const savePlatformSettings = async () => {
+    if (!platformSettings?.id) {
+      setMessage({ type: 'error', text: 'Platform settings not loaded yet' });
+      return;
+    }
     setSavingSettings(true);
     const { error } = await supabase
       .from('platform_settings')
@@ -103,7 +107,7 @@ export default function SuperAdminConfig() {
         balance_monitoring_enabled: balanceMonitoringEnabled,
         brevo_default_list_id: brevoListId || null,
       })
-      .limit(1);
+      .eq('id', platformSettings.id);
 
     if (error) {
       setMessage({ type: 'error', text: `Failed to save settings: ${error.message}` });
@@ -695,12 +699,12 @@ export default function SuperAdminConfig() {
                             </div>
                           </div>
                           <a
-                            href={`${import.meta.env.VITE_SUPABASE_URL?.replace('//', '//app.').replace('.supabase.co', '.supabase.com')}/project/_/settings/functions`}
+                            href="https://supabase.com/dashboard"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="ml-8 mt-2 inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 transition"
                           >
-                            Open Supabase Secrets
+                            Open Supabase Dashboard
                             <ExternalLink className="w-3 h-3" />
                           </a>
                         </div>

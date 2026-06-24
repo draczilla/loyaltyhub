@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
 import VerificationGuard from '../components/VerificationGuard';
-import { Menu, Mail, Plus, Edit2, Save, X, AlertCircle, Check } from 'lucide-react';
+import { Menu, Mail, Plus, CreditCard as Edit2, Save, X, AlertCircle, Check } from 'lucide-react';
 
 interface EmailTemplate {
   id: string;
@@ -108,6 +108,7 @@ export default function EmailTemplates() {
             name: formData.name,
             subject: formData.subject,
             body: formData.body,
+            trigger_type: formData.trigger_type,
             active: formData.active,
           })
           .eq('id', templateId);
