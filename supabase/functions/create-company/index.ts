@@ -55,13 +55,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: requestingUser, error: userCheckError } = await supabaseAdmin
-      .from("businesses")
-      .select("is_super_admin")
+    const { data: superAdmin, error: superAdminError } = await supabaseAdmin
+      .from("super_admins")
+      .select("id")
       .eq("id", user.id)
       .maybeSingle();
 
-    if (userCheckError || !requestingUser?.is_super_admin) {
+    if (superAdminError || !superAdmin) {
       return new Response(
         JSON.stringify({ success: false, error: "Only super admins can create companies" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
