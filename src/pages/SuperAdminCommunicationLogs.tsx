@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Menu, Search, Filter, Download, Mail, MessageSquare, Check, X, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import SuperAdminSidebar from '../components/SuperAdminSidebar';
 import { supabase } from '../lib/supabase';
@@ -51,15 +51,7 @@ export default function SuperAdminCommunicationLogs() {
   const [totalCount, setTotalCount] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
 
-  useEffect(() => {
-    loadBusinesses();
-  }, []);
-
-  useEffect(() => {
-    loadLogs();
-  }, [page, filterType, filterStatus, filterBusiness, filterProvider, dateFrom, dateTo, searchTerm]);
-
-  const loadBusinesses = async () => {
+  const loadBusinesses = useCallback(async () => {
     const { data } = await supabase
       .from('businesses')
       .select('id, company_name')
@@ -68,9 +60,13 @@ export default function SuperAdminCommunicationLogs() {
     if (data) {
       setBusinesses(data);
     }
-  };
+  }, []);
 
-  const loadLogs = async () => {
+  useEffect(() => {
+    loadBusinesses();
+  }, [loadBusinesses]);
+
+  const loadLogs = useCallback(async () => {
     setLoading(true);
 
     let query = supabase
@@ -126,7 +122,11 @@ export default function SuperAdminCommunicationLogs() {
     }
 
     setLoading(false);
-  };
+  }, [page, pageSize, filterType, filterStatus, filterBusiness, filterProvider, dateFrom, dateTo, searchTerm]);
+
+  useEffect(() => {
+    loadLogs();
+  }, [loadLogs]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {

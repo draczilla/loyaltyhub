@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
@@ -29,13 +29,7 @@ export default function SmsTemplates() {
     active: true,
   });
 
-  useEffect(() => {
-    if (business) {
-      loadTemplates();
-    }
-  }, [business]);
-
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     if (!business) return;
 
     setLoading(true);
@@ -59,7 +53,15 @@ export default function SmsTemplates() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [business]);
+
+  useEffect(() => {
+    if (business) {
+      loadTemplates();
+    } else {
+      setLoading(false);
+    }
+  }, [business, loadTemplates]);
 
   const handleEdit = (template: SmsTemplate) => {
     setEditingId(template.id);

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { logger } from '../lib/logger';
@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isTenantAdmin, setIsTenantAdmin] = useState(false);
 
-  const updateAuthState = (data: {
+  const updateAuthState = useCallback((data: {
     user_type?: string;
     data?: Business | null;
     tenant?: Tenant | null;
@@ -107,9 +107,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     sessionStorage.setItem('auth_state', JSON.stringify(cacheData));
     sessionStorage.setItem('auth_timestamp', Date.now().toString());
-  };
+  }, []);
 
-  const createBusinessForOAuthUser = async (userId: string) => {
+  const createBusinessForOAuthUser = useCallback(async (userId: string) => {
     try {
       // First check if this user is a super admin
       const { data: superAdminCheck } = await supabase
@@ -267,9 +267,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsSuperAdmin(false);
       setIsTenantAdmin(false);
     }
-  };
+  }, []);
 
-  const loadBusiness = async (userId: string, retryCount = 0) => {
+  const loadBusiness = useCallback(async (userId: string, retryCount = 0) => {
     const MAX_RETRIES = 3;
     const RETRY_DELAY = 1000;
 
@@ -313,7 +313,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [createBusinessForOAuthUser, updateAuthState]);
 
   useEffect(() => {
     let mounted = true;
@@ -382,7 +382,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
-  }, []);
+  }, [loadBusiness]);
 
   const signUp = async (email: string, password: string, companyName: string, tierId: string) => {
     const { data: authData, error: authError } = await supabase.auth.signUp({

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { X, MessageSquare, Send, AlertCircle, Check } from 'lucide-react';
 
@@ -40,11 +40,7 @@ export default function QuickSmsModal({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  useEffect(() => {
-    loadTemplates();
-  }, []);
-
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('sms_templates')
@@ -57,7 +53,11 @@ export default function QuickSmsModal({
       setTemplates(data);
     }
     setLoading(false);
-  };
+  }, [businessId]);
+
+  useEffect(() => {
+    loadTemplates();
+  }, [loadTemplates]);
 
   const replaceVariables = (text: string): string => {
     const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'Customer';

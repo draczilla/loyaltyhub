@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -47,11 +47,6 @@ export default function Dashboard() {
   const [dateOffset, setDateOffset] = useState(0);
 
   useEffect(() => {
-    console.log('[Dashboard] Business context updated:', business?.id);
-    if (business) {
-      loadDashboardStats();
-    }
-
     const payment = searchParams.get('payment');
     if (payment === 'success') {
       setPaymentNotification('success');
@@ -62,9 +57,9 @@ export default function Dashboard() {
       setSearchParams({});
       setTimeout(() => setPaymentNotification(null), 10000);
     }
-  }, [business, searchParams, setSearchParams, dateOffset]);
+  }, [searchParams, setSearchParams]);
 
-  const loadDashboardStats = async () => {
+  const loadDashboardStats = useCallback(async () => {
     if (!business) {
       console.log('[Dashboard] Cannot load stats: business is null');
       return;
@@ -133,7 +128,14 @@ export default function Dashboard() {
     } catch (error) {
       console.error('[Dashboard] Failed to load dashboard stats:', error);
     }
-  };
+  }, [business, dateOffset]);
+
+  useEffect(() => {
+    console.log('[Dashboard] Business context updated:', business?.id);
+    if (business) {
+      loadDashboardStats();
+    }
+  }, [business, loadDashboardStats]);
 
   const calculateCustomerGrowth = (customers: Array<{ created_at: string }>, offset: number = 0) => {
     const now = new Date();

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { one } from '../lib/relations';
@@ -43,11 +43,6 @@ export default function Communications() {
   const [loading, setLoading] = useState(true);
   const [selectedLog, setSelectedLog] = useState<CommunicationLog | null>(null);
 
-  useEffect(() => {
-    if (business) {
-      loadCommunicationLogs();
-    }
-  }, [business]);
 
   useEffect(() => {
     let filtered = logs;
@@ -96,7 +91,7 @@ export default function Communications() {
     setFilteredLogs(filtered);
   }, [searchQuery, filterType, filterStatus, showTestEmails, logs]);
 
-  const loadCommunicationLogs = async () => {
+  const loadCommunicationLogs = useCallback(async () => {
     if (!business) return;
 
     setLoading(true);
@@ -133,7 +128,13 @@ export default function Communications() {
     }
 
     setLoading(false);
-  };
+  }, [business]);
+
+  useEffect(() => {
+    if (business) {
+      loadCommunicationLogs();
+    }
+  }, [business, loadCommunicationLogs]);
 
   const getStatusIcon = (status: string, openedAt: string | null) => {
     if (openedAt) {

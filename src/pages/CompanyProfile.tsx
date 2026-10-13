@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { detectCountryDialCode, getAllCountries, getDialCode } from '../lib/countryCode';
@@ -78,23 +78,6 @@ export default function CompanyProfile() {
   });
   const [savingCompanyInfo, setSavingCompanyInfo] = useState(false);
 
-  useEffect(() => {
-    if (business && !tenant) {
-      // User doesn't have a tenant yet - create one
-      createTenantForExistingUser();
-    } else if (tenant && business) {
-      loadTeamData();
-      loadCreditsEligibility();
-    }
-  }, [tenant, business]);
-
-  // Detect country code when phone input is shown
-  useEffect(() => {
-    if (showPhoneInput && !detectingCountry) {
-      detectUserCountry();
-    }
-  }, [showPhoneInput]);
-
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -107,7 +90,7 @@ export default function CompanyProfile() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showCountryDropdown]);
 
-  const detectUserCountry = async () => {
+  const detectUserCountry = useCallback(async () => {
     setDetectingCountry(true);
     try {
       const { countryCode, dialCode: detectedDialCode } = await detectCountryDialCode();
@@ -119,7 +102,15 @@ export default function CompanyProfile() {
     } finally {
       setDetectingCountry(false);
     }
-  };
+  }, []);
+
+  // detectingCountry is set inside this callback. Depending on it would
+  // retrigger detection every time the flag flips back to false.
+  useEffect(() => {
+    if (showPhoneInput) {
+      detectUserCountry();
+    }
+  }, [showPhoneInput, detectUserCountry]);
 
   const handleCountryChange = (countryCode: string) => {
     setSelectedCountryCode(countryCode);
@@ -127,7 +118,7 @@ export default function CompanyProfile() {
     setShowCountryDropdown(false);
   };
 
-  const createTenantForExistingUser = async () => {
+  const createTenantForExistingUser = useCallback(async () => {
     if (!business) return;
 
     setLoading(true);
@@ -175,9 +166,9 @@ export default function CompanyProfile() {
       setError(err instanceof Error ? err.message : 'Failed to initialize company profile');
       setLoading(false);
     }
-  };
+  }, [business, user]);
 
-  const loadCreditsEligibility = async () => {
+  const loadCreditsEligibility = useCallback(async () => {
     if (!business) return;
 
     try {
@@ -196,7 +187,7 @@ export default function CompanyProfile() {
     } catch (err) {
       console.error('Error checking credits eligibility:', err);
     }
-  };
+  }, [business]);
 
   const handleSendEmailVerification = async () => {
     if (!business) return;
@@ -361,7 +352,7 @@ export default function CompanyProfile() {
     }
   };
 
-  const loadTeamData = async () => {
+  const loadTeamData = useCallback(async () => {
     if (!tenant || !business) return;
 
     setLoading(true);
@@ -434,7 +425,16 @@ export default function CompanyProfile() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tenant, business, isTenantAdmin]);
+
+  useEffect(() => {
+    if (business && !tenant) {
+      createTenantForExistingUser();
+    } else if (tenant && business) {
+      loadTeamData();
+      loadCreditsEligibility();
+    }
+  }, [tenant, business, createTenantForExistingUser, loadTeamData, loadCreditsEligibility]);
 
   const handleInviteMember = async (e: React.FormEvent) => {
     e.preventDefault();

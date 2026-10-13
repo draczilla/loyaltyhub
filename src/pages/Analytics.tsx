@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
@@ -76,13 +76,7 @@ export default function Analytics() {
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [dateOffset, setDateOffset] = useState(0);
 
-  useEffect(() => {
-    if (business) {
-      loadAnalytics();
-    }
-  }, [business, dateOffset]);
-
-  const loadAnalytics = async () => {
+  const loadAnalytics = useCallback(async () => {
     if (!business) return;
 
     setLoading(true);
@@ -199,7 +193,13 @@ export default function Analytics() {
     });
 
     setLoading(false);
-  };
+  }, [business, dateOffset]);
+
+  useEffect(() => {
+    if (business) {
+      loadAnalytics();
+    }
+  }, [business, loadAnalytics]);
 
   const stats = [
     {

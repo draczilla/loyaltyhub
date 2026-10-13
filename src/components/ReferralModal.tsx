@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import {
@@ -65,19 +65,7 @@ export default function ReferralModal({ onClose }: ReferralModalProps) {
     ? `${window.location.origin}/signup?ref=${referralCode.referral_code}`
     : '';
 
-  useEffect(() => {
-    if (business) {
-      loadReferralData();
-    }
-  }, [business]);
-
-  useEffect(() => {
-    if (referralLink) {
-      generateQRCode(referralLink);
-    }
-  }, [referralLink]);
-
-  const loadReferralData = async () => {
+  const loadReferralData = useCallback(async () => {
     if (!business) return;
 
     setLoading(true);
@@ -110,9 +98,15 @@ export default function ReferralModal({ onClose }: ReferralModalProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [business]);
 
-  const generateQRCode = async (url: string) => {
+  useEffect(() => {
+    if (business) {
+      loadReferralData();
+    }
+  }, [business, loadReferralData]);
+
+  const generateQRCode = useCallback(async (url: string) => {
     try {
       const qr = await QRCode.toDataURL(url, {
         width: 200,
@@ -123,7 +117,13 @@ export default function ReferralModal({ onClose }: ReferralModalProps) {
     } catch (error) {
       console.error('Error generating QR code:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (referralLink) {
+      generateQRCode(referralLink);
+    }
+  }, [referralLink, generateQRCode]);
 
   const copyToClipboard = async (text: string, type: 'code' | 'link') => {
     try {

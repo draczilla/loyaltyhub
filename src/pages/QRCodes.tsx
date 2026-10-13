@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
@@ -26,13 +26,7 @@ export default function QRCodes() {
   const [loading, setLoading] = useState(true);
   const [selectedQR, setSelectedQR] = useState<QRCodeData | null>(null);
 
-  useEffect(() => {
-    if (business) {
-      loadQRCodes();
-    }
-  }, [business]);
-
-  const loadQRCodes = async () => {
+  const loadQRCodes = useCallback(async () => {
     if (!business) return;
 
     setLoading(true);
@@ -56,7 +50,15 @@ export default function QRCodes() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [business]);
+
+  useEffect(() => {
+    if (business) {
+      loadQRCodes();
+    } else {
+      setLoading(false);
+    }
+  }, [business, loadQRCodes]);
 
   const generateQRCode = async () => {
     if (!business) return;
@@ -282,7 +284,7 @@ function QRCodeCard({
         },
       });
     }
-  }, [qrCode.code]);
+  }, [qrCode.code, qrCode.custom_url]);
 
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
@@ -366,7 +368,7 @@ function QRCodePreviewModal({
         },
       });
     }
-  }, [qrCode.code]);
+  }, [qrCode.code, qrCode.custom_url]);
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={onClose}>

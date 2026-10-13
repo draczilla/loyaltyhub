@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Menu, Search, ExternalLink, CreditCard, Calendar, Mail, Building, Download, Trash2, AlertTriangle, Phone, Plus } from 'lucide-react';
 import SuperAdminSidebar from '../components/SuperAdminSidebar';
 import { supabase } from '../lib/supabase';
@@ -34,15 +34,7 @@ export default function SuperAdminTenants() {
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  useEffect(() => {
-    loadTenants();
-  }, []);
-
-  useEffect(() => {
-    filterTenants();
-  }, [searchQuery, statusFilter, tenants]);
-
-  const loadTenants = async () => {
+  const loadTenants = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -136,9 +128,13 @@ export default function SuperAdminTenants() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const filterTenants = () => {
+  useEffect(() => {
+    loadTenants();
+  }, [loadTenants]);
+
+  const filterTenants = useCallback(() => {
     let filtered = tenants;
 
     if (searchQuery) {
@@ -155,7 +151,11 @@ export default function SuperAdminTenants() {
     }
 
     setFilteredTenants(filtered);
-  };
+  }, [tenants, searchQuery, statusFilter]);
+
+  useEffect(() => {
+    filterTenants();
+  }, [filterTenants]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -960,11 +960,7 @@ function CreateCompanyModal({ onClose, onCreated }: { onClose: () => void; onCre
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    loadTiers();
-  }, []);
-
-  const loadTiers = async () => {
+  const loadTiers = useCallback(async () => {
     const { data, error } = await supabase
       .from('subscription_tiers')
       .select('*')
@@ -981,7 +977,11 @@ function CreateCompanyModal({ onClose, onCreated }: { onClose: () => void; onCre
       }
     }
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    loadTiers();
+  }, [loadTiers]);
 
   const validatePhone = (phone: string) => {
     const e164Regex = /^\+[1-9]\d{1,14}$/;

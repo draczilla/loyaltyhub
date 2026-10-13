@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { one } from '../lib/relations';
 import { X, MessageSquare, CheckCircle, XCircle, Clock, Phone, Calendar } from 'lucide-react';
@@ -31,11 +31,7 @@ export default function SmsLogsModal({ businessId, onClose }: SmsLogsModalProps)
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'sent' | 'failed'>('all');
 
-  useEffect(() => {
-    loadLogs();
-  }, [filter]);
-
-  const loadLogs = async () => {
+  const loadLogs = useCallback(async () => {
     setLoading(true);
 
     let query = supabase
@@ -81,7 +77,11 @@ export default function SmsLogsModal({ businessId, onClose }: SmsLogsModalProps)
     }
 
     setLoading(false);
-  };
+  }, [businessId, filter]);
+
+  useEffect(() => {
+    loadLogs();
+  }, [loadLogs]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);

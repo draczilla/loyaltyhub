@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle, XCircle, Loader, Smartphone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -12,17 +12,7 @@ export default function VerifyPhone() {
   const [nextStep, setNextStep] = useState('');
   const token = searchParams.get('token');
 
-  useEffect(() => {
-    if (!token) {
-      setStatus('error');
-      setMessage('Invalid verification link. Please request a new SMS verification.');
-      return;
-    }
-
-    verifyPhone();
-  }, [token]);
-
-  const verifyPhone = async () => {
+  const verifyPhone = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .rpc('verify_token', {
@@ -59,7 +49,17 @@ export default function VerifyPhone() {
       setStatus('error');
       setMessage('An error occurred during verification. Please try again.');
     }
-  };
+  }, [token, navigate]);
+
+  useEffect(() => {
+    if (!token) {
+      setStatus('error');
+      setMessage('Invalid verification link. Please request a new SMS verification.');
+      return;
+    }
+
+    verifyPhone();
+  }, [token, verifyPhone]);
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">

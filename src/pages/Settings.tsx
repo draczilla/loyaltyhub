@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
@@ -29,14 +29,7 @@ export default function Settings() {
   const [googleProviderEnabled, setGoogleProviderEnabled] = useState(false);
   const [loadingGoogleStatus, setLoadingGoogleStatus] = useState(true);
 
-  useEffect(() => {
-    if (business) {
-      loadSettings();
-      checkGoogleProviderStatus();
-    }
-  }, [business]);
-
-  const checkGoogleProviderStatus = async () => {
+  const checkGoogleProviderStatus = useCallback(async () => {
     setLoadingGoogleStatus(true);
     try {
       const { error } = await supabase.auth.admin.listUsers();
@@ -67,9 +60,9 @@ export default function Settings() {
     } finally {
       setLoadingGoogleStatus(false);
     }
-  };
+  }, []);
 
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     if (!business) return;
 
     setLoading(true);
@@ -105,7 +98,16 @@ export default function Settings() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [business]);
+
+  useEffect(() => {
+    checkGoogleProviderStatus();
+    if (business) {
+      loadSettings();
+    } else {
+      setLoading(false);
+    }
+  }, [business, loadSettings, checkGoogleProviderStatus]);
 
   const handleSaveEmailConfig = async () => {
     if (!business) return;
