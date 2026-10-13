@@ -258,7 +258,7 @@ export default function UploadCustomersModal({ onClose, onSuccess }: UploadCusto
           'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         };
 
-        data.forEach((customer: any) => {
+        data.forEach((customer: { id: string; phone: string | null }) => {
           if (customer.phone) {
             const syncUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-customer-to-brevo`;
             fetch(syncUrl, {

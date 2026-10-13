@@ -38,7 +38,7 @@ export default function CustomerPortalLogin() {
 
       sessionStorage.setItem('customer_session', JSON.stringify(result.session));
       navigate('/customer/dashboard');
-    } catch (err: any) {
+    } catch {
       setError('An error occurred. Please try again.');
     } finally {
       setLoading(false);

@@ -4,7 +4,7 @@ export interface SendTransactionalSmsParams {
   businessId: string;
   customerId: string;
   triggerType: TransactionalTrigger;
-  variables?: Record<string, any>;
+  variables?: Record<string, string>;
 }
 
 export async function sendTransactionalSms(
@@ -19,7 +19,11 @@ export async function sendTransactionalSms(
   };
 
   try {
-    let payload: any;
+    let payload: SendTransactionalSmsParams | {
+      isTestSms: boolean;
+      recipientPhone: string;
+      message: string;
+    };
 
     // Direct SMS (Quick SMS feature)
     if (typeof phoneOrParams === 'string' && message) {

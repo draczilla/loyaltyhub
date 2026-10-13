@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Menu, Search, Filter, Download, Mail, MessageSquare, Check, X, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import SuperAdminSidebar from '../components/SuperAdminSidebar';
 import { supabase } from '../lib/supabase';
+import { one } from '../lib/relations';
 
 interface CommunicationLog {
   id: string;
@@ -17,10 +18,15 @@ interface CommunicationLog {
   provider: string | null;
   provider_message_id: string | null;
   failure_attempt_count: number;
-  metadata: any;
+  metadata: Record<string, unknown> | null;
   created_at: string;
   business_name?: string;
   customer_name?: string;
+}
+
+function metadataValue(metadata: CommunicationLog['metadata'], key: string): string {
+  const value = metadata?.[key];
+  return typeof value === 'string' ? value : '';
 }
 
 interface Business {
@@ -45,15 +51,7 @@ export default function SuperAdminCommunicationLogs() {
   const [totalCount, setTotalCount] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
 
-  useEffect(() => {
-    loadBusinesses();
-  }, []);
-
-  useEffect(() => {
-    loadLogs();
-  }, [page, filterType, filterStatus, filterBusiness, filterProvider, dateFrom, dateTo, searchTerm]);
-
-  const loadBusinesses = async () => {
+  const loadBusinesses = useCallback(async () => {
     const { data } = await supabase
       .from('businesses')
       .select('id, company_name')
@@ -62,9 +60,13 @@ export default function SuperAdminCommunicationLogs() {
     if (data) {
       setBusinesses(data);
     }
-  };
+  }, []);
 
-  const loadLogs = async () => {
+  useEffect(() => {
+    loadBusinesses();
+  }, [loadBusinesses]);
+
+  const loadLogs = useCallback(async () => {
     setLoading(true);
 
     let query = supabase
@@ -111,16 +113,20 @@ export default function SuperAdminCommunicationLogs() {
     if (error) {
       console.error('Error loading logs:', error);
     } else if (data) {
-      const formattedLogs = data.map((log: any) => ({
+      const formattedLogs = data.map((log) => ({
         ...log,
-        business_name: log.businesses?.company_name,
+        business_name: one(log.businesses)?.company_name,
       }));
       setLogs(formattedLogs);
       setTotalCount(count || 0);
     }
 
     setLoading(false);
-  };
+  }, [page, pageSize, filterType, filterStatus, filterBusiness, filterProvider, dateFrom, dateTo, searchTerm]);
+
+  useEffect(() => {
+    loadLogs();
+  }, [loadLogs]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -172,7 +178,7 @@ export default function SuperAdminCommunicationLogs() {
       log.type,
       log.status,
       log.provider || '',
-      log.type === 'email' ? (log.metadata?.recipient_email || '') : (log.metadata?.recipient_phone || ''),
+      log.type === 'email' ? metadataValue(log.metadata, 'recipient_email') : metadataValue(log.metadata, 'recipient_phone'),
       log.subject || log.content.substring(0, 50),
       log.error_message || '',
     ]);
@@ -286,7 +292,8 @@ export default function SuperAdminCommunicationLogs() {
                     <select
                       value={filterType}
                       onChange={(e) => {
-                        setFilterType(e.target.value as any);
+                        const value = e.target.value;
+                        if (value === 'all' || value === 'email' || value === 'sms') setFilterType(value);
                         setPage(1);
                       }}
                       className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
@@ -302,7 +309,10 @@ export default function SuperAdminCommunicationLogs() {
                     <select
                       value={filterStatus}
                       onChange={(e) => {
-                        setFilterStatus(e.target.value as any);
+                        const value = e.target.value;
+                        if (value === 'all' || value === 'sent' || value === 'failed' || value === 'pending') {
+                          setFilterStatus(value);
+                        }
                         setPage(1);
                       }}
                       className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
@@ -442,9 +452,7 @@ export default function SuperAdminCommunicationLogs() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="text-sm text-white max-w-xs truncate">
-                              {log.type === 'email'
-                                ? log.metadata?.recipient_email || 'N/A'
-                                : log.metadata?.recipient_phone || 'N/A'}
+                              {metadataValue(log.metadata, log.type === 'email' ? 'recipient_email' : 'recipient_phone') || 'N/A'}
                             </div>
                           </td>
                           <td className="px-4 py-3">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
@@ -29,13 +29,7 @@ export default function Campaigns() {
   const [createError, setCreateError] = useState('');
   const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    if (business) {
-      loadCampaigns();
-    }
-  }, [business]);
-
-  const loadCampaigns = async () => {
+  const loadCampaigns = useCallback(async () => {
     if (!business) return;
 
     setLoading(true);
@@ -59,7 +53,13 @@ export default function Campaigns() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [business]);
+
+  useEffect(() => {
+    if (business) {
+      loadCampaigns();
+    }
+  }, [business, loadCampaigns]);
 
   const filteredCampaigns = campaigns.filter((campaign) => {
     if (filter === 'all') return true;

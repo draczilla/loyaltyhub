@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { redirectToCheckout, redirectToPortal } from '../lib/stripe';
@@ -31,11 +31,7 @@ export default function Subscription() {
   const [error, setError] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, [business]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!business) return;
 
     try {
@@ -64,7 +60,15 @@ export default function Subscription() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [business]);
+
+  useEffect(() => {
+    if (business) {
+      loadData();
+    } else {
+      setLoading(false);
+    }
+  }, [business, loadData]);
 
   const handleTierSelect = async (tier: SubscriptionTier) => {
     if (!tier.stripe_price_id) {

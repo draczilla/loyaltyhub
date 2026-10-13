@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -49,24 +49,10 @@ export default function TestEmailTracking() {
   const [testEmails, setTestEmails] = useState<TestEmail[]>([]);
   const [rateLimitInfo, setRateLimitInfo] = useState<RateLimitInfo | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const testEmailsRef = useRef(testEmails);
+  testEmailsRef.current = testEmails;
 
-  useEffect(() => {
-    if (business) {
-      loadTestEmails();
-      loadRateLimitInfo();
-
-      const interval = setInterval(() => {
-        const hasPending = testEmails.some(email => email.status === 'sent' && !email.opened_at);
-        if (hasPending) {
-          loadTestEmails();
-        }
-      }, 10000);
-
-      return () => clearInterval(interval);
-    }
-  }, [business]);
-
-  const loadRateLimitInfo = async () => {
+  const loadRateLimitInfo = useCallback(async () => {
     if (!business) return;
 
     try {
@@ -79,9 +65,9 @@ export default function TestEmailTracking() {
     } catch (err) {
       console.error('Error loading rate limit info:', err);
     }
-  };
+  }, [business]);
 
-  const loadTestEmails = async () => {
+  const loadTestEmails = useCallback(async () => {
     if (!business) return;
 
     setLoading(true);
@@ -103,7 +89,23 @@ export default function TestEmailTracking() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [business]);
+
+  useEffect(() => {
+    if (!business) return;
+
+    loadTestEmails();
+    loadRateLimitInfo();
+
+    const interval = setInterval(() => {
+      const hasPending = testEmailsRef.current.some((email) => email.status === 'sent' && !email.opened_at);
+      if (hasPending) {
+        loadTestEmails();
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [business, loadTestEmails, loadRateLimitInfo]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -357,7 +359,7 @@ export default function TestEmailTracking() {
 
         <button
           type="submit"
-          disabled={sending || (rateLimitInfo && !rateLimitInfo.allowed)}
+          disabled={sending || rateLimitInfo?.allowed === false}
           className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition font-medium"
         >
           {sending ? (

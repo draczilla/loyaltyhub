@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { one } from '../lib/relations';
 import { Award, Gift, TrendingUp, LogOut, Ticket, Percent, Sparkles, Clock } from 'lucide-react';
 
 interface CustomerSession {
@@ -20,7 +21,10 @@ interface ProgramProgress {
   program: {
     name: string;
     type: string;
-    config: any;
+    config: {
+      minimumRedemption?: number;
+      stampsRequired?: number;
+    };
     status: string;
   };
 }
@@ -100,11 +104,18 @@ export default function CustomerDashboard() {
     ]);
 
     if (programsResult.data) {
-      setPrograms(programsResult.data as any);
+      setPrograms(programsResult.data.map((row) => ({
+        ...row,
+        program: one(row.program) ?? { name: '', type: '', config: {}, status: '' },
+      })));
     }
 
     if (rewardsResult.data) {
-      setRewards(rewardsResult.data as any);
+      setRewards(rewardsResult.data.map((row) => ({
+        ...row,
+        reward: one(row.reward) ?? { name: '', description: '', type: '' },
+        program: one(row.program) ?? { name: '' },
+      })));
     }
 
     setLoading(false);

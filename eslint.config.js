@@ -21,7 +21,12 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': [
         'warn',
-        { allowConstantExport: true },
+        {
+          allowConstantExport: true,
+          // useAuth is the public hook for AuthProvider and has to be exported
+          // from the same module as the context it reads.
+          allowExportNames: ['useAuth'],
+        },
       ],
     },
   }

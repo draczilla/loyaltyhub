@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
@@ -11,7 +11,7 @@ interface SmsTemplate {
   trigger_type: 'welcome' | 'reward_earned' | 'points_milestone' | 'birthday' | 'custom';
   message_template: string;
   active: boolean;
-  config: Record<string, any>;
+  config: Record<string, unknown>;
 }
 
 export default function SmsTemplates() {
@@ -29,13 +29,7 @@ export default function SmsTemplates() {
     active: true,
   });
 
-  useEffect(() => {
-    if (business) {
-      loadTemplates();
-    }
-  }, [business]);
-
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     if (!business) return;
 
     setLoading(true);
@@ -59,7 +53,15 @@ export default function SmsTemplates() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [business]);
+
+  useEffect(() => {
+    if (business) {
+      loadTemplates();
+    } else {
+      setLoading(false);
+    }
+  }, [business, loadTemplates]);
 
   const handleEdit = (template: SmsTemplate) => {
     setEditingId(template.id);
@@ -233,7 +235,7 @@ export default function SmsTemplates() {
                   </label>
                   <select
                     value={formData.trigger_type}
-                    onChange={(e) => setFormData({ ...formData, trigger_type: e.target.value as any })}
+                    onChange={(e) => setFormData({ ...formData, trigger_type: e.target.value as SmsTemplate['trigger_type'] })}
                     className="w-full px-4 py-3 bg-black border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
                   >
                     <option value="welcome">Welcome Message</option>
@@ -334,7 +336,7 @@ export default function SmsTemplates() {
                         </label>
                         <select
                           value={formData.trigger_type}
-                          onChange={(e) => setFormData({ ...formData, trigger_type: e.target.value as any })}
+                          onChange={(e) => setFormData({ ...formData, trigger_type: e.target.value as SmsTemplate['trigger_type'] })}
                           className="w-full px-4 py-3 bg-black border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
                         >
                           <option value="welcome">Welcome Message</option>

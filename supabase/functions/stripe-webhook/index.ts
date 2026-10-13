@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import Stripe from "npm:stripe@19.1.0";
-import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.57.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -142,7 +142,7 @@ Deno.serve(async (req: Request) => {
 });
 
 async function handleCheckoutCompleted(
-  supabase: any,
+  supabase: SupabaseClient,
   stripe: Stripe,
   session: Stripe.Checkout.Session
 ) {
@@ -195,7 +195,7 @@ async function handleCheckoutCompleted(
 }
 
 async function handleSubscriptionUpdated(
-  supabase: any,
+  supabase: SupabaseClient,
   subscription: Stripe.Subscription
 ) {
   const { data: stripeCustomer } = await supabase
@@ -247,7 +247,7 @@ async function handleSubscriptionUpdated(
 }
 
 async function handleSubscriptionDeleted(
-  supabase: any,
+  supabase: SupabaseClient,
   subscription: Stripe.Subscription
 ) {
   const { data: stripeCustomer } = await supabase
@@ -295,7 +295,7 @@ async function handleSubscriptionDeleted(
 }
 
 async function handlePaymentSucceeded(
-  supabase: any,
+  supabase: SupabaseClient,
   invoice: Stripe.Invoice
 ) {
   const { data: stripeCustomer } = await supabase
@@ -327,7 +327,7 @@ async function handlePaymentSucceeded(
 }
 
 async function handlePaymentFailed(
-  supabase: any,
+  supabase: SupabaseClient,
   invoice: Stripe.Invoice
 ) {
   const { data: stripeCustomer } = await supabase

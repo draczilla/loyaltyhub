@@ -93,7 +93,7 @@ Deno.serve(async (req: Request) => {
 
     // Update the communication log with open information
     const newOpenCount = (communicationLog.open_count || 0) + 1;
-    const updateData: any = {
+    const updateData: { open_count: number; opened_at?: string } = {
       open_count: newOpenCount,
     };
 

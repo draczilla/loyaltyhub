@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Menu, RefreshCw, Mail, MessageSquare, DollarSign, TrendingDown, AlertCircle, ExternalLink, Check, X, Clock, Calendar } from 'lucide-react';
 import SuperAdminSidebar from '../components/SuperAdminSidebar';
 import { supabase } from '../lib/supabase';
@@ -61,23 +61,7 @@ export default function SuperAdminBrevoBalance() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setLoading(true);
-    await Promise.all([
-      loadPlatformSettings(),
-      loadBalanceHistory(),
-      fetchCurrentBalance(),
-      loadDailyAllowance(),
-      loadDailyStats(),
-    ]);
-    setLoading(false);
-  };
-
-  const loadPlatformSettings = async () => {
+  const loadPlatformSettings = useCallback(async () => {
     const { data } = await supabase
       .from('platform_settings')
       .select('balance_thresholds, balance_monitoring_enabled, last_balance_check, daily_email_limit, daily_email_warning_threshold')
@@ -87,9 +71,9 @@ export default function SuperAdminBrevoBalance() {
     if (data) {
       setPlatformSettings(data);
     }
-  };
+  }, []);
 
-  const loadDailyAllowance = async () => {
+  const loadDailyAllowance = useCallback(async () => {
     try {
       const { data, error } = await supabase.rpc('get_daily_email_allowance').maybeSingle();
       if (error) throw error;
@@ -99,9 +83,9 @@ export default function SuperAdminBrevoBalance() {
     } catch (err) {
       console.error('Error loading daily allowance:', err);
     }
-  };
+  }, []);
 
-  const loadDailyStats = async () => {
+  const loadDailyStats = useCallback(async () => {
     try {
       const { data, error } = await supabase.rpc('get_daily_email_stats', { p_days: 30 });
       if (error) throw error;
@@ -111,9 +95,9 @@ export default function SuperAdminBrevoBalance() {
     } catch (err) {
       console.error('Error loading daily stats:', err);
     }
-  };
+  }, []);
 
-  const loadBalanceHistory = async () => {
+  const loadBalanceHistory = useCallback(async () => {
     const { data } = await supabase
       .from('brevo_account_balance')
       .select('*')
@@ -123,9 +107,9 @@ export default function SuperAdminBrevoBalance() {
     if (data) {
       setHistory(data);
     }
-  };
+  }, []);
 
-  const fetchCurrentBalance = async () => {
+  const fetchCurrentBalance = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
@@ -153,7 +137,23 @@ export default function SuperAdminBrevoBalance() {
       setError(err instanceof Error ? err.message : 'Failed to fetch balance');
       console.error('Error fetching balance:', err);
     }
-  };
+  }, []);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    await Promise.all([
+      loadPlatformSettings(),
+      loadBalanceHistory(),
+      fetchCurrentBalance(),
+      loadDailyAllowance(),
+      loadDailyStats(),
+    ]);
+    setLoading(false);
+  }, [loadPlatformSettings, loadBalanceHistory, fetchCurrentBalance, loadDailyAllowance, loadDailyStats]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -50,24 +50,7 @@ export default function SignUp() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
-  useEffect(() => {
-    loadTiers();
-
-    // Check for referral code in URL
-    const refCode = searchParams.get('ref');
-    if (refCode) {
-      setReferralCode(refCode.toUpperCase());
-      validateReferralCode(refCode);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (location.state?.selectedTier && tiers.length > 0) {
-      setSelectedTier(location.state.selectedTier);
-    }
-  }, [location.state, tiers]);
-
-  const loadTiers = async () => {
+  const loadTiers = useCallback(async () => {
     const { data } = await supabase
       .from('subscription_tiers')
       .select('*')
@@ -80,9 +63,9 @@ export default function SignUp() {
         setSelectedTier(freeTier.id);
       }
     }
-  };
+  }, []);
 
-  const validateReferralCode = async (code: string) => {
+  const validateReferralCode = useCallback(async (code: string) => {
     if (!code || code.trim() === '') {
       setReferralValid(null);
       setReferrerName('');
@@ -114,7 +97,23 @@ export default function SignUp() {
       setReferralValid(false);
       setReferrerName('');
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadTiers();
+
+    const refCode = searchParams.get('ref');
+    if (refCode) {
+      setReferralCode(refCode.toUpperCase());
+      validateReferralCode(refCode);
+    }
+  }, [searchParams, loadTiers, validateReferralCode]);
+
+  useEffect(() => {
+    if (location.state?.selectedTier && tiers.length > 0) {
+      setSelectedTier(location.state.selectedTier);
+    }
+  }, [location.state, tiers]);
 
   const handleReferralCodeChange = (value: string) => {
     const upperValue = value.toUpperCase();

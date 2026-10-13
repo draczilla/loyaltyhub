@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.57.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,7 +11,7 @@ interface TransactionalSmsRequest {
   businessId?: string;
   customerId?: string;
   triggerType?: 'welcome' | 'reward_earned' | 'points_milestone' | 'birthday';
-  variables?: Record<string, any>;
+  variables?: Record<string, string>;
   recipientPhone?: string;
   message?: string;
   isTestSms?: boolean;
@@ -146,7 +146,7 @@ async function sendSmsViaTwilio(
 }
 
 async function updateProviderStatus(
-  supabase: any,
+  supabase: SupabaseClient,
   provider: string,
   success: boolean,
   error?: string
@@ -184,7 +184,7 @@ async function updateProviderStatus(
 }
 
 async function sendSystemAlert(
-  supabase: any,
+  supabase: SupabaseClient,
   fromProvider: string,
   toProvider: string,
   error: string
@@ -286,8 +286,18 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    let business: any = null;
-    let customer: any = null;
+    let business: {
+      id: string;
+      company_name: string;
+      tier_id: string;
+      usage_sms_monthly: number;
+    } | null = null;
+    let customer: {
+      first_name: string | null;
+      last_name: string | null;
+      total_points: number | null;
+      phone: string | null;
+    } | null = null;
     let finalMessage: string;
     let finalRecipientPhone: string;
 
@@ -449,7 +459,6 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     const primaryProvider = forceProvider || platformSettings?.primary_sms_provider || 'brevo';
-    const fallbackProvider = primaryProvider === 'brevo' ? 'twilio' : 'brevo';
 
     const brevoApiKey = Deno.env.get("BREVO_API_KEY");
     const brevoSender = Deno.env.get("BREVO_SMS_SENDER");

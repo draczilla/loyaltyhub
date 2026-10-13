@@ -66,7 +66,7 @@ const COUNTRY_DIAL_CODES: Record<string, CountryInfo> = {
 function getCountryFromLocale(): string | null {
   try {
     // Try navigator.language (e.g., "en-US", "fr-FR")
-    const language = navigator.language || (navigator as any).userLanguage;
+    const language = navigator.language || (navigator as Navigator & { userLanguage?: string }).userLanguage;
     if (language && language.includes('-')) {
       const countryCode = language.split('-')[1].toUpperCase();
       if (COUNTRY_DIAL_CODES[countryCode]) {

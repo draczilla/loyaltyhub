@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
@@ -10,7 +10,7 @@ interface LoyaltyProgram {
   name: string;
   type: 'points' | 'stamp_card' | 'rebate_code' | 'discount' | 'free_item';
   status: 'active' | 'paused' | 'archived';
-  config: Record<string, any>;
+  config: Record<string, unknown>;
   created_at: string;
 }
 
@@ -38,15 +38,7 @@ export default function Programs() {
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  useEffect(() => {
-    if (business) {
-      loadPrograms();
-    } else {
-      setLoading(false);
-    }
-  }, [business]);
-
-  const loadPrograms = async () => {
+  const loadPrograms = useCallback(async () => {
     if (!business) {
       setLoading(false);
       setError('Business context not available');
@@ -70,7 +62,15 @@ export default function Programs() {
     }
 
     setLoading(false);
-  };
+  }, [business]);
+
+  useEffect(() => {
+    if (business) {
+      loadPrograms();
+    } else {
+      setLoading(false);
+    }
+  }, [business, loadPrograms]);
 
   const toggleProgramStatus = async (programId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'active' ? 'paused' : 'active';

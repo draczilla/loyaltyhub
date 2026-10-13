@@ -5,8 +5,6 @@ import { Link } from 'react-router-dom';
 const CONSENT_KEY = 'cookie_consent';
 const CONSENT_VERSION = '1';
 
-type ConsentState = 'accepted' | 'declined' | null;
-
 export default function CookieConsent() {
   const [visible, setVisible] = useState(false);
   const [showDetails, setShowDetails] = useState(false);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
@@ -12,7 +12,7 @@ interface EmailTemplate {
   body: string;
   trigger_type: 'welcome' | 'promotional' | 'reward' | 'birthday' | 'custom';
   active: boolean;
-  config: Record<string, any>;
+  config: Record<string, unknown>;
 }
 
 export default function EmailTemplates() {
@@ -31,13 +31,7 @@ export default function EmailTemplates() {
     active: true,
   });
 
-  useEffect(() => {
-    if (business) {
-      loadTemplates();
-    }
-  }, [business]);
-
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     if (!business) return;
 
     setLoading(true);
@@ -61,7 +55,15 @@ export default function EmailTemplates() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [business]);
+
+  useEffect(() => {
+    if (business) {
+      loadTemplates();
+    } else {
+      setLoading(false);
+    }
+  }, [business, loadTemplates]);
 
   const handleEdit = (template: EmailTemplate) => {
     setEditingId(template.id);
@@ -268,7 +270,7 @@ export default function EmailTemplates() {
                   </label>
                   <select
                     value={formData.trigger_type}
-                    onChange={(e) => setFormData({ ...formData, trigger_type: e.target.value as any })}
+                    onChange={(e) => setFormData({ ...formData, trigger_type: e.target.value as EmailTemplate['trigger_type'] })}
                     className="w-full px-4 py-3 bg-black border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
                   >
                     <option value="welcome">Welcome Email</option>
@@ -377,7 +379,7 @@ export default function EmailTemplates() {
                         </label>
                         <select
                           value={formData.trigger_type}
-                          onChange={(e) => setFormData({ ...formData, trigger_type: e.target.value as any })}
+                          onChange={(e) => setFormData({ ...formData, trigger_type: e.target.value as EmailTemplate['trigger_type'] })}
                           className="w-full px-4 py-3 bg-black border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
                         >
                           <option value="welcome">Welcome Email</option>

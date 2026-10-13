@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { X, Mail, Send, AlertCircle, Check, Edit2 } from 'lucide-react';
 
@@ -43,11 +43,7 @@ export default function FastEmailModal({
   const [editedSubject, setEditedSubject] = useState('');
   const [editedBody, setEditedBody] = useState('');
 
-  useEffect(() => {
-    loadTemplates();
-  }, []);
-
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('email_templates')
@@ -60,7 +56,11 @@ export default function FastEmailModal({
       setTemplates(data);
     }
     setLoading(false);
-  };
+  }, [businessId]);
+
+  useEffect(() => {
+    loadTemplates();
+  }, [loadTemplates]);
 
   const replaceVariables = (text: string): string => {
     const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'Customer';

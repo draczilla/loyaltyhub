@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
@@ -39,11 +39,6 @@ export default function Customers() {
   const [syncingCustomerId, setSyncingCustomerId] = useState<string | null>(null);
   const [bulkSyncing, setBulkSyncing] = useState(false);
 
-  useEffect(() => {
-    if (business) {
-      loadCustomers();
-    }
-  }, [business]);
 
   useEffect(() => {
     if (searchQuery) {
@@ -61,7 +56,7 @@ export default function Customers() {
     }
   }, [searchQuery, customers]);
 
-  const loadCustomers = async () => {
+  const loadCustomers = useCallback(async () => {
     if (!business) return;
 
     setLoading(true);
@@ -86,7 +81,13 @@ export default function Customers() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [business]);
+
+  useEffect(() => {
+    if (business) {
+      loadCustomers();
+    }
+  }, [business, loadCustomers]);
 
   const handleCustomerAdded = () => {
     loadCustomers();

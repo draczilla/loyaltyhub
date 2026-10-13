@@ -167,7 +167,7 @@ Deno.serve(async (req: Request) => {
     let brevoData;
     try {
       brevoData = responseText ? JSON.parse(responseText) : {};
-    } catch (e) {
+    } catch {
       brevoData = { rawResponse: responseText };
     }
 

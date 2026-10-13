@@ -1,7 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import Sidebar from '../components/Sidebar';
+import { one } from '../lib/relations';
+import {
+  activityLabel,
+  calculateCustomerGrowth,
+  countRewardsRedeemed,
+  customerDisplayName,
+  summarizeProgramPerformance,
+  type CustomerGrowthPoint,
+  type ProgramPerformance,
+} from '../lib/analytics';
 import {
   Menu,
   TrendingUp,
@@ -15,7 +25,10 @@ import {
   Send,
   LineChart,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  MessageSquare,
+  Award,
+  Stamp,
 } from 'lucide-react';
 
 interface AnalyticsData {
@@ -31,12 +44,15 @@ interface AnalyticsData {
   smsSent: number;
 }
 
-interface CustomerGrowthData {
-  month: string;
-  customers: number;
-  growth: number;
-  growthPercentage: number;
-  date: Date;
+interface ActivityItem {
+  id: string;
+  type: string;
+  description: string | null;
+  createdAt: string;
+  pointsChange: number;
+  stampsChange: number;
+  customerName: string;
+  programName: string | null;
 }
 
 export default function Analytics() {
@@ -55,53 +71,12 @@ export default function Analytics() {
     emailOpenRate: 0,
     smsSent: 0
   });
-  const [customerGrowth, setCustomerGrowth] = useState<CustomerGrowthData[]>([]);
+  const [customerGrowth, setCustomerGrowth] = useState<CustomerGrowthPoint[]>([]);
+  const [programPerformance, setProgramPerformance] = useState<ProgramPerformance[]>([]);
+  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [dateOffset, setDateOffset] = useState(0);
 
-  useEffect(() => {
-    if (business) {
-      loadAnalytics();
-    }
-  }, [business, dateOffset]);
-
-  const calculateCustomerGrowth = (customers: Array<{ created_at: string }>, offset: number = 0) => {
-    const now = new Date();
-    const daysData: CustomerGrowthData[] = [];
-    const totalDays = 30;
-
-    const baseDate = new Date(now);
-    baseDate.setDate(now.getDate() - (offset * totalDays));
-
-    for (let i = totalDays - 1; i >= 0; i--) {
-      const currentDate = new Date(baseDate);
-      currentDate.setDate(baseDate.getDate() - i);
-      currentDate.setHours(23, 59, 59, 999);
-
-      const customersUpToDate = customers.filter(
-        c => new Date(c.created_at) <= currentDate
-      ).length;
-
-      const previousDayCustomers = daysData.length > 0 ? daysData[daysData.length - 1].customers : 0;
-      const growth = customersUpToDate - previousDayCustomers;
-      const growthPercentage = previousDayCustomers > 0
-        ? Math.round((growth / previousDayCustomers) * 100)
-        : customersUpToDate > 0 ? 100 : 0;
-
-      const dayLabel = currentDate.getDate().toString();
-
-      daysData.push({
-        month: dayLabel,
-        customers: customersUpToDate,
-        growth,
-        growthPercentage,
-        date: new Date(currentDate),
-      });
-    }
-
-    return daysData;
-  };
-
-  const loadAnalytics = async () => {
+  const loadAnalytics = useCallback(async () => {
     if (!business) return;
 
     setLoading(true);
@@ -109,9 +84,12 @@ export default function Analytics() {
     const [
       customersResult,
       programsResult,
+      programListResult,
       campaignsResult,
       emailsResult,
-      smsResult
+      smsResult,
+      transactionStatsResult,
+      recentTransactionsResult,
     ] = await Promise.all([
       supabase
         .from('customers')
@@ -119,12 +97,17 @@ export default function Analytics() {
         .eq('business_id', business.id),
       supabase
         .from('loyalty_programs')
-        .select('id', { count: 'exact' })
+        .select('id', { count: 'exact', head: true })
         .eq('business_id', business.id)
         .eq('status', 'active'),
       supabase
+        .from('loyalty_programs')
+        .select('id, name, type, status')
+        .eq('business_id', business.id)
+        .order('name'),
+      supabase
         .from('campaigns')
-        .select('id', { count: 'exact' })
+        .select('id', { count: 'exact', head: true })
         .eq('business_id', business.id)
         .eq('status', 'sent'),
       supabase
@@ -135,10 +118,34 @@ export default function Analytics() {
         .eq('is_test_email', false),
       supabase
         .from('communication_logs')
-        .select('id', { count: 'exact' })
+        .select('id', { count: 'exact', head: true })
         .eq('business_id', business.id)
         .eq('type', 'sms')
-        .eq('is_test_email', false)
+        .eq('is_test_email', false),
+      supabase
+        .from('transactions')
+        .select('program_id, type')
+        .eq('business_id', business.id),
+      supabase
+        .from('transactions')
+        .select(`
+          id,
+          type,
+          description,
+          created_at,
+          points_change,
+          stamps_change,
+          customers (
+            first_name,
+            last_name
+          ),
+          loyalty_programs (
+            name
+          )
+        `)
+        .eq('business_id', business.id)
+        .order('created_at', { ascending: false })
+        .limit(12),
     ]);
 
     const emailsSent = emailsResult.data?.length || 0;
@@ -147,6 +154,24 @@ export default function Analytics() {
 
     const growthData = calculateCustomerGrowth(customersResult.data || [], dateOffset);
     setCustomerGrowth(growthData);
+
+    const transactionStats = transactionStatsResult.data || [];
+    const programs = programListResult.data || [];
+    setProgramPerformance(summarizeProgramPerformance(programs, transactionStats));
+    setRecentActivity((recentTransactionsResult.data || []).map((transaction) => {
+      const customer = one(transaction.customers);
+      const program = one(transaction.loyalty_programs);
+      return {
+        id: transaction.id,
+        type: transaction.type,
+        description: transaction.description,
+        createdAt: transaction.created_at,
+        pointsChange: transaction.points_change || 0,
+        stampsChange: transaction.stamps_change || 0,
+        customerName: customerDisplayName(customer),
+        programName: program?.name ?? null,
+      };
+    }));
 
     const totalCustomers = customersResult.count || 0;
     const previousPeriodCustomers = growthData.length >= 2 ? growthData[0].customers : 0;
@@ -158,7 +183,7 @@ export default function Analytics() {
       totalCustomers,
       activePrograms: programsResult.count || 0,
       campaignsSent: campaignsResult.count || 0,
-      rewardsRedeemed: 0,
+      rewardsRedeemed: countRewardsRedeemed(transactionStats),
       customerGrowth: customerGrowthPct,
       engagementRate: emailsSent > 0 ? Math.round((emailsOpened / emailsSent) * 100) : 0,
       emailsSent,
@@ -168,7 +193,13 @@ export default function Analytics() {
     });
 
     setLoading(false);
-  };
+  }, [business, dateOffset]);
+
+  useEffect(() => {
+    if (business) {
+      loadAnalytics();
+    }
+  }, [business, loadAnalytics]);
 
   const stats = [
     {
@@ -202,6 +233,22 @@ export default function Analytics() {
       icon: TrendingUp,
       color: 'text-blue-400',
       bgColor: 'bg-blue-500/10'
+    },
+    {
+      label: 'Rewards Redeemed',
+      value: analytics.rewardsRedeemed.toLocaleString(),
+      change: 0,
+      icon: Award,
+      color: 'text-purple-400',
+      bgColor: 'bg-purple-500/10'
+    },
+    {
+      label: 'SMS Sent',
+      value: analytics.smsSent.toLocaleString(),
+      change: 0,
+      icon: MessageSquare,
+      color: 'text-green-400',
+      bgColor: 'bg-green-500/10'
     }
   ];
 
@@ -242,7 +289,7 @@ export default function Analytics() {
             </div>
           ) : (
             <div className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {stats.map((stat) => (
                   <div
                     key={stat.label}
@@ -340,7 +387,7 @@ export default function Analytics() {
                       const isPositiveGrowth = data.growth > 0;
 
                       return (
-                        <div key={data.month} className="flex-1 flex flex-col items-center justify-end h-full group">
+                        <div key={data.date.toISOString()} className="flex-1 flex flex-col items-center justify-end h-full group">
                           <div className="relative w-full flex flex-col items-center justify-end h-full mb-2">
                             <div className="absolute -top-12 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800 border border-zinc-700 px-3 py-2 rounded-lg z-10 whitespace-nowrap">
                               <div className="text-white font-bold text-sm">{data.customers} customers</div>
@@ -423,22 +470,89 @@ export default function Analytics() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                   <h3 className="text-lg font-bold text-white mb-4">Program Performance</h3>
-                  <div className="h-64 flex items-center justify-center text-gray-500">
-                    <div className="text-center">
-                      <Gift className="w-12 h-12 mx-auto mb-2 text-gray-600" />
-                      <p>Chart visualization coming soon</p>
+                  {programPerformance.length === 0 ? (
+                    <div className="h-64 flex items-center justify-center text-gray-500">
+                      <div className="text-center">
+                        <Gift className="w-12 h-12 mx-auto mb-2 text-gray-600" />
+                        <p>Create a loyalty program to see performance</p>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="space-y-4 max-h-80 overflow-y-auto pr-1">
+                      {programPerformance.map((program) => {
+                        const maxTransactions = Math.max(...programPerformance.map((item) => item.transactions), 1);
+                        const width = Math.max((program.transactions / maxTransactions) * 100, program.transactions > 0 ? 8 : 0);
+                        return (
+                          <div key={program.id}>
+                            <div className="flex items-center justify-between gap-3 mb-1">
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-white truncate">{program.name}</p>
+                                <p className="text-xs text-gray-500 capitalize">
+                                  {program.type.replace(/_/g, ' ')} · {program.status}
+                                </p>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <p className="text-sm text-white">{program.transactions}</p>
+                                <p className="text-xs text-gray-500">{program.rewardsRedeemed} redeemed</p>
+                              </div>
+                            </div>
+                            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-gradient-to-r from-orange-500 to-orange-400 rounded-full"
+                                style={{ width: `${width}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
                   <h3 className="text-lg font-bold text-white mb-4">Recent Activity</h3>
-                  <div className="h-64 flex items-center justify-center text-gray-500">
-                    <div className="text-center">
-                      <TrendingUp className="w-12 h-12 mx-auto mb-2 text-gray-600" />
-                      <p>Activity feed coming soon</p>
+                  {recentActivity.length === 0 ? (
+                    <div className="h-64 flex items-center justify-center text-gray-500">
+                      <div className="text-center">
+                        <TrendingUp className="w-12 h-12 mx-auto mb-2 text-gray-600" />
+                        <p>Transactions will show up as customers earn and redeem rewards</p>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                      {recentActivity.map((activity) => {
+                        const delta = activity.pointsChange !== 0
+                          ? `${activity.pointsChange > 0 ? '+' : ''}${activity.pointsChange} pts`
+                          : activity.stampsChange !== 0
+                            ? `${activity.stampsChange > 0 ? '+' : ''}${activity.stampsChange} stamps`
+                            : null;
+                        return (
+                          <div key={activity.id} className="flex items-start gap-3 p-3 bg-zinc-950/60 border border-zinc-800 rounded-lg">
+                            <div className="w-9 h-9 rounded-lg bg-orange-500/10 flex items-center justify-center flex-shrink-0">
+                              <Stamp className="w-4 h-4 text-orange-400" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-sm font-medium text-white truncate">{activityLabel(activity.type)}</p>
+                                <p className="text-xs text-gray-500 flex-shrink-0">
+                                  {new Date(activity.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <p className="text-xs text-gray-400 truncate">
+                                {activity.customerName}
+                                {activity.programName ? ` · ${activity.programName}` : ''}
+                              </p>
+                              {(activity.description || delta) && (
+                                <p className="text-xs text-gray-500 mt-1 truncate">
+                                  {activity.description || delta}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

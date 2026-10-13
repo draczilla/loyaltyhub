@@ -3,6 +3,7 @@ import { Menu, DollarSign, Users, CreditCard, TrendingUp, AlertCircle, Mail, Mes
 import SuperAdminSidebar from '../components/SuperAdminSidebar';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { one } from '../lib/relations';
 
 interface TenantStats {
   totalTenants: number;
@@ -41,8 +42,13 @@ export default function SuperAdminDashboard() {
   const [recentTenants, setRecentTenants] = useState<Tenant[]>([]);
   const [superAdmins, setSuperAdmins] = useState<SuperAdmin[]>([]);
   const [loading, setLoading] = useState(true);
-  const [brevoBalance, setBrevoBalance] = useState<any>(null);
-  const [dailyAllowance, setDailyAllowance] = useState<any>(null);
+  const [brevoBalance, setBrevoBalance] = useState<{ sms_credits: number; last_sync_at: string } | null>(null);
+  const [dailyAllowance, setDailyAllowance] = useState<{
+    remaining_today: number;
+    daily_limit: number;
+    sent_today: number;
+    percentage_used: number;
+  } | null>(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -65,9 +71,9 @@ export default function SuperAdminDashboard() {
 
       if (!data) return;
 
-      setSuperAdmins(data.map((admin: any) => ({
+      setSuperAdmins(data.map((admin) => ({
         id: admin.id,
-        email: admin.email || admin.id,
+        email: 'email' in admin && typeof admin.email === 'string' ? admin.email : admin.id,
         created_at: admin.created_at,
       })));
     } catch (err) {
@@ -92,8 +98,13 @@ export default function SuperAdminDashboard() {
     try {
       const { data, error } = await supabase.rpc('get_daily_email_allowance').maybeSingle();
       if (error) throw error;
-      if (data) {
-        setDailyAllowance(data);
+      if (data && typeof data === 'object' && 'remaining_today' in data) {
+        setDailyAllowance(data as {
+          remaining_today: number;
+          daily_limit: number;
+          sent_today: number;
+          percentage_used: number;
+        });
       }
     } catch (err) {
       console.error('Error loading daily allowance:', err);
@@ -121,7 +132,7 @@ export default function SuperAdminDashboard() {
       }
 
       const enrichedTenants = await Promise.all(
-        tenantsData.slice(0, 5).map(async (tenant: any) => {
+        tenantsData.slice(0, 5).map(async (tenant) => {
           const { data: business } = await supabase
             .from('businesses')
             .select(`
@@ -144,8 +155,8 @@ export default function SuperAdminDashboard() {
             credits_remaining: business?.credits_remaining || 0,
             stripe_price_id: null,
             subscription_period_end: null,
-            tier_name: business?.subscription_tiers?.name || 'Free',
-            price_monthly: business?.subscription_tiers?.price_monthly || '0',
+            tier_name: one(business?.subscription_tiers)?.name || 'Free',
+            price_monthly: one(business?.subscription_tiers)?.price_monthly || '0',
           };
         })
       );
@@ -162,11 +173,11 @@ export default function SuperAdminDashboard() {
         `)
         .not('tenant_id', 'is', null);
 
-      const activeTenantCount = allBusinesses?.filter((b: any) => b.subscription_status === 'active').length || 0;
-      const trialTenantCount = allBusinesses?.filter((b: any) => b.subscription_status === 'trial').length || 0;
+      const activeTenantCount = allBusinesses?.filter((b) => b.subscription_status === 'active').length || 0;
+      const trialTenantCount = allBusinesses?.filter((b) => b.subscription_status === 'trial').length || 0;
       const totalRevenue = allBusinesses
-        ?.filter((b: any) => b.subscription_status === 'active')
-        .reduce((sum: number, b: any) => sum + parseFloat(b.subscription_tiers?.price_monthly || '0'), 0) || 0;
+        ?.filter((b) => b.subscription_status === 'active')
+        .reduce((sum, b) => sum + parseFloat(String(one(b.subscription_tiers)?.price_monthly || '0')), 0) || 0;
 
       setStats({
         totalTenants: tenantsData.length,

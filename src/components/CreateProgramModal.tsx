@@ -7,10 +7,41 @@ interface CreateProgramModalProps {
   onSubmit: (programData: ProgramFormData) => Promise<void>;
 }
 
+export interface DiscountTier {
+  visits: number;
+  discount: number;
+}
+
+export interface ProgramConfig {
+  pointsPerDollar?: number;
+  minimumRedemption?: number;
+  pointsExpireDays?: number;
+  welcomeBonus?: number;
+  stampsRequired?: number;
+  rewardDescription?: string;
+  cardExpireDays?: number;
+  allowMultipleCards?: boolean;
+  codePrefix?: string;
+  discountType?: string;
+  discountValue?: number;
+  validDays?: number;
+  singleUse?: boolean;
+  tiers?: DiscountTier[];
+  itemName?: string;
+  itemDescription?: string;
+  requiredPurchases?: number;
+  recurring?: boolean;
+  reminderType?: string;
+  advanceNoticeDays?: number;
+  reminderTime?: string;
+  messageTemplate?: string;
+  allowCustomerOptOut?: boolean;
+}
+
 export interface ProgramFormData {
   name: string;
   type: 'points' | 'stamp_card' | 'rebate_code' | 'discount' | 'free_item' | 'sms_reminder';
-  config: Record<string, any>;
+  config: ProgramConfig;
 }
 
 const programTypes = [
@@ -71,7 +102,7 @@ export default function CreateProgramModal({ open, onClose, onSubmit }: CreatePr
   const [step, setStep] = useState<'type' | 'config'>('type');
   const [selectedType, setSelectedType] = useState<ProgramFormData['type'] | null>(null);
   const [programName, setProgramName] = useState('');
-  const [config, setConfig] = useState<Record<string, any>>({});
+  const [config, setConfig] = useState<ProgramConfig>({});
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState('');
 
@@ -148,7 +179,7 @@ export default function CreateProgramModal({ open, onClose, onSubmit }: CreatePr
     }
 
     if (selectedType === 'discount' && config.tiers) {
-      const visitCounts = config.tiers.map((t: any) => t.visits);
+      const visitCounts = config.tiers.map((tier) => tier.visits);
       if (new Set(visitCounts).size !== visitCounts.length) {
         setValidationError('Discount tiers must have unique visit counts');
         return;
@@ -180,7 +211,7 @@ export default function CreateProgramModal({ open, onClose, onSubmit }: CreatePr
     onClose();
   };
 
-  const updateConfig = (key: string, value: any) => {
+  const updateConfig = <K extends keyof ProgramConfig>(key: K, value: ProgramConfig[K]) => {
     setConfig(prev => ({ ...prev, [key]: value }));
   };
 
@@ -434,7 +465,7 @@ export default function CreateProgramModal({ open, onClose, onSubmit }: CreatePr
                   <p className="text-sm text-gray-400">
                     Set discount tiers based on number of visits. Customers automatically qualify as they reach each tier.
                   </p>
-                  {config.tiers?.map((tier: any, index: number) => (
+                  {config.tiers?.map((tier, index: number) => (
                     <div key={index} className="grid grid-cols-2 gap-4 p-4 bg-zinc-800 rounded-lg">
                       <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -445,7 +476,7 @@ export default function CreateProgramModal({ open, onClose, onSubmit }: CreatePr
                           min="1"
                           value={tier.visits}
                           onChange={(e) => {
-                            const newTiers = [...config.tiers];
+                            const newTiers = [...(config.tiers ?? [])];
                             newTiers[index].visits = parseInt(e.target.value);
                             updateConfig('tiers', newTiers);
                           }}
@@ -462,7 +493,7 @@ export default function CreateProgramModal({ open, onClose, onSubmit }: CreatePr
                           max="100"
                           value={tier.discount}
                           onChange={(e) => {
-                            const newTiers = [...config.tiers];
+                            const newTiers = [...(config.tiers ?? [])];
                             newTiers[index].discount = parseInt(e.target.value);
                             updateConfig('tiers', newTiers);
                           }}

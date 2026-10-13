@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { logger } from '../lib/logger';
@@ -62,7 +62,7 @@ interface AuthContextType {
   loading: boolean;
   isSuperAdmin: boolean;
   isTenantAdmin: boolean;
-  signUp: (email: string, password: string, companyName: string, tierId: string) => Promise<{ error: AuthError | null }>;
+  signUp: (email: string, password: string, companyName: string, tierId: string) => Promise<{ error: { message: string } | null }>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
@@ -81,14 +81,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [isTenantAdmin, setIsTenantAdmin] = useState(false);
 
-  const updateAuthState = (data: any, userId: string) => {
+  const updateAuthState = useCallback((data: {
+    user_type?: string;
+    data?: Business | null;
+    tenant?: Tenant | null;
+  }, userId: string) => {
     if (data.user_type === 'super_admin') {
       setBusiness(null);
       setTenant(null);
       setIsSuperAdmin(true);
       setIsTenantAdmin(false);
     } else if (data.user_type === 'business') {
-      setBusiness(data.data);
+      setBusiness(data.data ?? null);
       setTenant(data.tenant || null);
       setIsSuperAdmin(false);
       setIsTenantAdmin(data.data?.is_tenant_admin || false);
@@ -103,21 +107,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     sessionStorage.setItem('auth_state', JSON.stringify(cacheData));
     sessionStorage.setItem('auth_timestamp', Date.now().toString());
-  };
+  }, []);
 
-  const loadAuthDataInBackground = async (userId: string) => {
-    try {
-      const { data, error } = await supabase.rpc('get_user_auth_data', { user_id_param: userId });
-
-      if (!error && data) {
-        updateAuthState(data, userId);
-      }
-    } catch (error) {
-      logger.error('Background auth refresh failed:', error);
-    }
-  };
-
-  const createBusinessForOAuthUser = async (userId: string) => {
+  const createBusinessForOAuthUser = useCallback(async (userId: string) => {
     try {
       // First check if this user is a super admin
       const { data: superAdminCheck } = await supabase
@@ -275,9 +267,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsSuperAdmin(false);
       setIsTenantAdmin(false);
     }
-  };
+  }, []);
 
-  const loadBusiness = async (userId: string, retryCount = 0) => {
+  const loadBusiness = useCallback(async (userId: string, retryCount = 0) => {
     const MAX_RETRIES = 3;
     const RETRY_DELAY = 1000;
 
@@ -321,14 +313,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [createBusinessForOAuthUser, updateAuthState]);
 
   useEffect(() => {
     let mounted = true;
-    let timeoutId: NodeJS.Timeout;
-    const startTime = performance.now();
 
     console.log('[AuthContext] Initializing authentication');
+
+    const timeoutId = setTimeout(() => {
+      if (mounted) {
+        logger.error('Auth initialization timeout - forcing loading to false');
+        setLoading(false);
+      }
+    }, 5000);
 
     const initAuth = async () => {
       try {
@@ -361,13 +358,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    timeoutId = setTimeout(() => {
-      if (mounted) {
-        logger.error('Auth initialization timeout - forcing loading to false');
-        setLoading(false);
-      }
-    }, 5000);
-
     initAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -392,7 +382,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
-  }, []);
+  }, [loadBusiness]);
 
   const signUp = async (email: string, password: string, companyName: string, tierId: string) => {
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -425,7 +415,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (tenantError) {
         logger.error('Tenant creation error:', tenantError);
-        return { error: tenantError as any };
+        return { error: tenantError };
       }
 
       tenantToUse = newTenant;
@@ -439,7 +429,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!tenantToUse) {
       logger.error('No tenant available');
-      return { error: { message: 'Failed to create or find tenant' } as any };
+      return { error: { message: 'Failed to create or find tenant' } };
     }
 
     if (!existingBusiness) {
@@ -463,7 +453,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (businessError) {
         logger.error('Business creation error:', businessError);
-        return { error: businessError as any };
+        return { error: businessError };
       }
 
       const { error: memberError } = await supabase
