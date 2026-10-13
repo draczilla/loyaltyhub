@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { one } from '../lib/relations';
 import Sidebar from '../components/Sidebar';
 import { Menu, Mail, MessageSquare, Search, CheckCircle, XCircle, Clock, Eye, User, Beaker } from 'lucide-react';
 
@@ -115,8 +116,17 @@ export default function Communications() {
     }
 
     if (data) {
-      setLogs(data as any);
-      setFilteredLogs(data as any);
+      const mapped = data.map((row) => ({
+        ...row,
+        customer: one(row.customer) ?? {
+          first_name: null,
+          last_name: null,
+          email: null,
+          phone: null,
+        },
+      }));
+      setLogs(mapped);
+      setFilteredLogs(mapped);
     } else {
       setLogs([]);
       setFilteredLogs([]);
@@ -217,7 +227,10 @@ export default function Communications() {
               <div className="flex gap-2">
                 <select
                   value={filterType}
-                  onChange={(e) => setFilterType(e.target.value as any)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === 'all' || value === 'email' || value === 'sms') setFilterType(value);
+                  }}
                   className="px-4 py-2 bg-black border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
                 >
                   <option value="all">All Types</option>
@@ -227,7 +240,12 @@ export default function Communications() {
 
                 <select
                   value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value as any)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === 'all' || value === 'sent' || value === 'failed' || value === 'opened') {
+                      setFilterStatus(value);
+                    }
+                  }}
                   className="px-4 py-2 bg-black border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition"
                 >
                   <option value="all">All Status</option>

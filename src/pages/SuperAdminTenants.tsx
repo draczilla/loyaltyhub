@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Menu, Search, ExternalLink, CreditCard, Calendar, Mail, Building, Download, Trash2, AlertTriangle, Phone, Plus } from 'lucide-react';
 import SuperAdminSidebar from '../components/SuperAdminSidebar';
 import { supabase } from '../lib/supabase';
+import { one } from '../lib/relations';
 
 interface Tenant {
   id: string;
@@ -71,7 +72,7 @@ export default function SuperAdminTenants() {
       }
 
       const enrichedTenants = await Promise.all(
-        data.map(async (tenant: any) => {
+        data.map(async (tenant) => {
           const { data: businesses } = await supabase
             .from('businesses')
             .select(`
@@ -121,8 +122,8 @@ export default function SuperAdminTenants() {
             total_customers: totalCustomers,
             total_sms_sent: totalSmsSent,
             subscription_status: businesses?.subscription_status || 'trial',
-            tier_name: businesses?.subscription_tiers?.name || 'Free',
-            price_monthly: businesses?.subscription_tiers?.price_monthly || '0',
+            tier_name: one(businesses?.subscription_tiers)?.name || 'Free',
+            price_monthly: String(one(businesses?.subscription_tiers)?.price_monthly || '0'),
             credits_remaining: businesses?.credits_remaining || 0,
           };
         })
@@ -360,7 +361,14 @@ function TenantDetailsModal({ tenant, onClose, onDeleted, onUpdated }: { tenant:
   const [deletionReason, setDeletionReason] = useState('');
   const [confirmDataExported, setConfirmDataExported] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [exportSummary, setExportSummary] = useState<any>(null);
+  const [exportSummary, setExportSummary] = useState<{
+    data_counts: {
+      businesses: number;
+      customers: number;
+      loyalty_programs: number;
+      communication_logs: number;
+    };
+  } | null>(null);
   const [editingPhone, setEditingPhone] = useState(false);
   const [phoneValue, setPhoneValue] = useState(tenant.admin_phone || '');
   const [savingPhone, setSavingPhone] = useState(false);
@@ -478,7 +486,17 @@ function TenantDetailsModal({ tenant, onClose, onDeleted, onUpdated }: { tenant:
         throw new Error(error.error || 'Failed to export data');
       }
 
-      const result = await response.json();
+      const result = await response.json() as {
+        summary: {
+          data_counts: {
+            businesses: number;
+            customers: number;
+            loyalty_programs: number;
+            communication_logs: number;
+          };
+        };
+        data: unknown;
+      };
       setExportSummary(result.summary);
 
       const blob = new Blob([JSON.stringify(result.data, null, 2)], {
@@ -938,7 +956,7 @@ function CreateCompanyModal({ onClose, onCreated }: { onClose: () => void; onCre
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [tierId, setTierId] = useState('');
-  const [tiers, setTiers] = useState<any[]>([]);
+  const [tiers, setTiers] = useState<Array<{ id: string; name: string; price_monthly: number | string }>>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
@@ -953,7 +971,11 @@ function CreateCompanyModal({ onClose, onCreated }: { onClose: () => void; onCre
       .order('price_monthly', { ascending: true });
 
     if (!error && data) {
-      setTiers(data);
+      setTiers(data.map((tier) => ({
+        id: tier.id,
+        name: tier.name,
+        price_monthly: tier.price_monthly,
+      })));
       if (data.length > 0) {
         setTierId(data[0].id);
       }
@@ -1111,7 +1133,7 @@ function CreateCompanyModal({ onClose, onCreated }: { onClose: () => void; onCre
                 >
                   {tiers.map((tier) => (
                     <option key={tier.id} value={tier.id}>
-                      {tier.name} - ${parseFloat(tier.price_monthly).toFixed(2)}/month
+                      {tier.name} - ${parseFloat(String(tier.price_monthly)).toFixed(2)}/month
                     </option>
                   ))}
                 </select>

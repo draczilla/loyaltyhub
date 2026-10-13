@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle, XCircle, Loader, Mail } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { readVerifyTokenResult } from '../lib/verification';
 
 export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
@@ -35,11 +36,12 @@ export default function VerifyEmail() {
         throw error;
       }
 
-      if (data && typeof data === 'object' && 'success' in data) {
-        if (data.success) {
+      const result = readVerifyTokenResult(data);
+      if (result) {
+        if (result.success) {
           setStatus('success');
-          setMessage((data as any).message || 'Email verified successfully!');
-          setNextStep((data as any).next_step || '');
+          setMessage(result.message || 'Email verified successfully!');
+          setNextStep(result.next_step || '');
 
           setTimeout(() => {
             // Redirect to dashboard after successful email verification
@@ -48,8 +50,8 @@ export default function VerifyEmail() {
           }, 2000);
         } else {
           setStatus('error');
-          setMessage((data as any).message || 'Verification failed');
-          setNextStep((data as any).next_step || 'login');
+          setMessage(result.message || 'Verification failed');
+          setNextStep(result.next_step || 'login');
         }
       }
     } catch (err) {

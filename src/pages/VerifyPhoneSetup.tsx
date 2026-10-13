@@ -33,8 +33,7 @@ export default function VerifyPhoneSetup() {
     return cleaned;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const sendVerification = async () => {
     setError('');
     setLoading(true);
 
@@ -82,8 +81,13 @@ export default function VerifyPhoneSetup() {
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await sendVerification();
+  };
+
   const handleResend = async () => {
-    await handleSubmit(new Event('submit') as any);
+    await sendVerification();
   };
 
   if (!business) {

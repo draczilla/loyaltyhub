@@ -57,7 +57,11 @@ export default function CompanyProfile() {
   const [dialCode, setDialCode] = useState('+1');
   const [detectingCountry, setDetectingCountry] = useState(false);
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
-  const [creditsEligibility, setCreditsEligibility] = useState<any>(null);
+  const [creditsEligibility, setCreditsEligibility] = useState<{
+    eligible: boolean;
+    reason: string;
+    credits_to_grant?: number;
+  } | null>(null);
   const [isEditingCompanyInfo, setIsEditingCompanyInfo] = useState(false);
   const [companyInfoForm, setCompanyInfoForm] = useState({
     company_name: '',
@@ -182,7 +186,13 @@ export default function CompanyProfile() {
       });
 
       if (error) throw error;
-      setCreditsEligibility(data?.[0] || null);
+      const row = Array.isArray(data) ? data[0] : data;
+      if (row && typeof row === 'object' && 'eligible' in row && 'reason' in row) {
+        const eligibility = row as { eligible: boolean; reason: string; credits_to_grant?: number };
+        setCreditsEligibility(eligibility);
+      } else {
+        setCreditsEligibility(null);
+      }
     } catch (err) {
       console.error('Error checking credits eligibility:', err);
     }
@@ -240,7 +250,7 @@ export default function CompanyProfile() {
 
     try {
       // Combine dial code with phone number - ensure E.164 format
-      let formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `${dialCode}${phoneNumber}`;
+      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `${dialCode}${phoneNumber}`;
 
       // Validate E.164 format: must start with +
       if (!formattedPhone.startsWith('+')) {

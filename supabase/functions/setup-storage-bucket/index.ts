@@ -69,7 +69,7 @@ Deno.serve(async (req: Request) => {
       try {
         const { error: policyError } = await supabase.rpc('exec_sql', { sql: policy });
         results.push({ policy, success: !policyError, error: policyError?.message });
-      } catch (e) {
+      } catch {
         // Try direct SQL execution
         try {
           await fetch(`${supabaseUrl}/rest/v1/rpc/exec`, {

@@ -13,7 +13,13 @@ export default function SuperAdminTestCommunications() {
   const [success, setSuccess] = useState('');
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [smsProvider, setSmsProvider] = useState<'auto' | 'brevo' | 'twilio'>('auto');
-  const [platformSettings, setPlatformSettings] = useState<any>(null);
+  const [platformSettings, setPlatformSettings] = useState<{
+    primary_sms_provider?: string | null;
+    sms_provider_status?: {
+      brevo?: { healthy?: boolean };
+      twilio?: { healthy?: boolean };
+    } | null;
+  } | null>(null);
 
   const [emailForm, setEmailForm] = useState({
     recipientEmail: '',
@@ -107,7 +113,12 @@ export default function SuperAdminTestCommunications() {
         throw new Error('No active session');
       }
 
-      const requestBody: any = {
+      const requestBody: {
+        recipientPhone: string;
+        message: string;
+        isTestSms: boolean;
+        forceProvider?: string;
+      } = {
         recipientPhone: smsForm.recipientPhone,
         message: smsForm.message,
         isTestSms: true,
@@ -140,7 +151,7 @@ export default function SuperAdminTestCommunications() {
       try {
         result = await response.json();
         console.log('SMS test response body:', result);
-      } catch (parseError) {
+      } catch {
         const text = await response.text();
         console.error('Failed to parse response as JSON:', text);
         throw new Error(`Server returned ${response.status}: ${text}`);

@@ -109,8 +109,6 @@ Deno.serve(async (req: Request) => {
       const clickEvents = stats.events.filter((e) => e.event === "click");
 
       if (openEvents.length > 0) {
-        const firstOpen = openEvents[0];
-
         for (const openEvent of openEvents) {
           const { error: insertError } = await supabase
             .from("email_opens")

@@ -107,6 +107,13 @@ Deno.serve(async (req: Request) => {
       .eq("email", email.trim())
       .maybeSingle();
 
+    if (businessCheckError) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Failed to check for an existing business" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     if (existingBusiness) {
       return new Response(
         JSON.stringify({
@@ -118,6 +125,13 @@ Deno.serve(async (req: Request) => {
     }
 
     const { data: { users }, error: authListError } = await supabaseAdmin.auth.admin.listUsers();
+
+    if (authListError) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Failed to check for an existing login" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const orphanedAuthUser = users?.find(u => u.email === email.trim());
 

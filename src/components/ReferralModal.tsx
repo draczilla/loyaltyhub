@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import {
-  X, Copy, Check, QrCode as QrCodeIcon, Gift, Share2,
+  X, Copy, Check, Gift, Share2,
   Mail, Trophy, TrendingUp, Award, Users, MessageCircle
 } from 'lucide-react';
 import QRCode from 'qrcode';
@@ -160,9 +160,6 @@ export default function ReferralModal({ onClose }: ReferralModalProps) {
   };
 
   const shareViaLinkedIn = () => {
-    const text = encodeURIComponent(
-      `I've been using LoyaltyHUB for customer loyalty management. Join with my referral code: ${referralCode?.referral_code}`
-    );
     window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(referralLink)}`, '_blank');
   };
 
@@ -171,11 +168,6 @@ export default function ReferralModal({ onClose }: ReferralModalProps) {
       `Hey! Join me on LoyaltyHUB using my referral code ${referralCode?.referral_code} and we both earn rewards! ${referralLink}`
     );
     window.open(`https://wa.me/?text=${text}`, '_blank');
-  };
-
-  const getBadgeIcon = (type: string) => {
-    const tier = BADGE_TIERS.find(b => b.type === type);
-    return tier ? tier.color : 'from-gray-500 to-gray-700';
   };
 
   const getStatusColor = (status: string) => {

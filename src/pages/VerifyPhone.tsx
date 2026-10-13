@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle, XCircle, Loader, Smartphone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { readVerifyTokenResult } from '../lib/verification';
 
 export default function VerifyPhone() {
   const [searchParams] = useSearchParams();
@@ -34,19 +35,20 @@ export default function VerifyPhone() {
         throw error;
       }
 
-      if (data && typeof data === 'object' && 'success' in data) {
-        if (data.success) {
+      const result = readVerifyTokenResult(data);
+      if (result) {
+        if (result.success) {
           setStatus('success');
-          setMessage((data as any).message || 'Phone verified successfully!');
-          setNextStep((data as any).next_step || '');
+          setMessage(result.message || 'Phone verified successfully!');
+          setNextStep(result.next_step || 'dashboard');
 
           setTimeout(() => {
             navigate('/dashboard');
           }, 2000);
         } else {
           setStatus('error');
-          setMessage((data as any).message || 'Verification failed');
-          setNextStep((data as any).next_step || '');
+          setMessage(result.message || 'Verification failed');
+          setNextStep(result.next_step || 'request_new');
         }
       } else {
         setStatus('error');
@@ -97,19 +99,31 @@ export default function VerifyPhone() {
                 <h1 className="text-2xl font-bold text-white mb-2">Verification Failed</h1>
                 <p className="text-gray-400 mb-6">{message}</p>
 
-                <button
-                  onClick={() => navigate('/company-profile')}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium rounded-lg transition"
-                >
-                  <Smartphone className="w-5 h-5" />
-                  Go to Company Profile
-                </button>
+                {nextStep === 'request_new' && (
+                  <button
+                    onClick={() => navigate('/company-profile')}
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium rounded-lg transition"
+                  >
+                    <Smartphone className="w-5 h-5" />
+                    Request a New Code
+                  </button>
+                )}
+
+                {nextStep === 'email_verification' && (
+                  <button
+                    onClick={() => navigate('/verify-email')}
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium rounded-lg transition"
+                  >
+                    <Smartphone className="w-5 h-5" />
+                    Verify Your Email
+                  </button>
+                )}
 
                 <button
-                  onClick={() => navigate('/dashboard')}
+                  onClick={() => navigate(nextStep === 'dashboard' ? '/dashboard' : '/company-profile')}
                   className="w-full mt-3 py-3 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white font-medium rounded-lg transition"
                 >
-                  Back to Dashboard
+                  {nextStep === 'dashboard' ? 'Go to Dashboard' : 'Go to Company Profile'}
                 </button>
               </>
             )}

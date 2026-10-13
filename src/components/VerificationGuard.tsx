@@ -79,6 +79,10 @@ export default function VerificationGuard({ children, featureName = 'this featur
     );
   }
 
+  if (!business) {
+    return <>{children}</>;
+  }
+
   const isVerified = business.email_verified && business.phone_verified;
   const hasCredits = (business.credits_remaining || 0) > 0;
 

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { sendTransactionalSms } from '../lib/transactionalSms';
 import { X, MessageSquare, Send, AlertCircle, Check } from 'lucide-react';
 
 interface SmsTemplate {

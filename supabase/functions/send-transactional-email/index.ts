@@ -157,7 +157,7 @@ function convertPlainTextToHtml(text: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
+    .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 
   const paragraphs = escaped.split(/\n\n+/).map((para) => {
@@ -234,7 +234,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    let business: any = null;
+    let business: {
+      id: string;
+      tier_id: string | null;
+      usage_email_monthly: number | null;
+    } | null = null;
     let emailTrackingEnabled = false;
     let resolvedBusinessId = businessId;
 

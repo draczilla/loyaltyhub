@@ -13,12 +13,12 @@ interface SystemAlertRequest {
   error?: string;
   alert_email?: string;
   alert_phone?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   alert_data?: {
     title: string;
     message: string;
     severity: string;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
   };
 }
 

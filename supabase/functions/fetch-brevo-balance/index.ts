@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -39,7 +39,7 @@ async function fetchBrevoAccountInfo(apiKey: string): Promise<BrevoBalanceData> 
       throw new Error(`Brevo API returned ${response.status}: ${errorText}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as BrevoAccountResponse;
 
     let emailCredits = 0;
     let smsCredits = 0;
@@ -68,7 +68,7 @@ async function fetchBrevoAccountInfo(apiKey: string): Promise<BrevoBalanceData> 
 }
 
 async function checkBalanceThresholds(
-  supabase: any,
+  supabase: SupabaseClient,
   emailCredits: number,
   smsCredits: number
 ): Promise<void> {

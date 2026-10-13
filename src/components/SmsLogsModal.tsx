@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { one } from '../lib/relations';
 import { X, MessageSquare, CheckCircle, XCircle, Clock, Phone, Calendar } from 'lucide-react';
 
 interface SmsLog {
@@ -66,7 +67,17 @@ export default function SmsLogsModal({ businessId, onClose }: SmsLogsModalProps)
     const { data, error } = await query;
 
     if (!error && data) {
-      setLogs(data as SmsLog[]);
+      setLogs(data.map((row) => ({
+        id: row.id,
+        customer_id: row.customer_id,
+        content: row.content,
+        status: row.status,
+        created_at: row.created_at,
+        provider: row.provider,
+        error_message: row.error_message,
+        metadata: (row.metadata ?? {}) as SmsLog['metadata'],
+        customers: one(row.customers),
+      })));
     }
 
     setLoading(false);

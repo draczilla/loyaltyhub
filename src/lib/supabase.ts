@@ -116,7 +116,7 @@ export type Database = {
           first_name: string | null;
           last_name: string | null;
           birthday: string | null;
-          custom_fields: Record<string, any>;
+          custom_fields: Record<string, unknown>;
           opted_in_sms: boolean;
           opted_in_email: boolean;
           total_points: number;
@@ -136,7 +136,7 @@ export type Database = {
           name: string;
           type: 'points' | 'stamp_card' | 'rebate_code' | 'discount' | 'free_item';
           status: 'active' | 'paused' | 'archived';
-          config: Record<string, any>;
+          config: Record<string, unknown>;
           created_at: string;
           updated_at: string;
         };
@@ -153,7 +153,7 @@ export type Database = {
           type: 'point_redemption' | 'stamp_completion' | 'rebate' | 'discount' | 'free_item';
           cost_points: number;
           cost_stamps: number;
-          config: Record<string, any>;
+          config: Record<string, unknown>;
           active: boolean;
           created_at: string;
         };
@@ -170,7 +170,7 @@ export type Database = {
           points_change: number;
           stamps_change: number;
           description: string | null;
-          metadata: Record<string, any>;
+          metadata: Record<string, unknown>;
           created_by: string | null;
           created_at: string;
         };
@@ -195,7 +195,7 @@ export type Database = {
         Row: {
           id: string;
           business_id: string;
-          form_config: any[];
+          form_config: unknown[];
           welcome_message: string;
           thank_you_message: string;
           active: boolean;
@@ -218,7 +218,7 @@ export type Database = {
           recipient_count: number;
           opened_count: number;
           clicked_count: number;
-          config: Record<string, any>;
+          config: Record<string, unknown>;
           created_at: string;
         };
         Insert: Omit<Database['public']['Tables']['campaigns']['Row'], 'id' | 'created_at'>;
@@ -229,8 +229,8 @@ export type Database = {
           id: string;
           business_id: string;
           service: 'mailchimp' | 'vonage';
-          credentials: Record<string, any>;
-          settings: Record<string, any>;
+          credentials: Record<string, unknown>;
+          settings: Record<string, unknown>;
           active: boolean;
           last_sync_at: string | null;
           created_at: string;
@@ -267,7 +267,7 @@ export type Database = {
           trigger_type: 'welcome' | 'reward_earned' | 'points_milestone' | 'birthday' | 'custom';
           message_template: string;
           active: boolean;
-          config: Record<string, any>;
+          config: Record<string, unknown>;
           created_at: string;
           updated_at: string;
         };

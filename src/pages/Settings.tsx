@@ -58,7 +58,7 @@ export default function Settings() {
             const settings = await response.json();
             setGoogleProviderEnabled(settings?.external?.google?.enabled || false);
           }
-        } catch (err) {
+        } catch {
           setGoogleProviderEnabled(true);
         }
       }

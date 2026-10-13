@@ -10,7 +10,7 @@ interface LoyaltyProgram {
   name: string;
   type: 'points' | 'stamp_card' | 'rebate_code' | 'discount' | 'free_item';
   status: 'active' | 'paused' | 'archived';
-  config: Record<string, any>;
+  config: Record<string, unknown>;
   created_at: string;
 }
 

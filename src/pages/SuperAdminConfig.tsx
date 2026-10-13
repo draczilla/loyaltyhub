@@ -19,7 +19,20 @@ interface SubscriptionTier {
 interface PlatformSettings {
   id: string;
   primary_sms_provider: 'brevo' | 'twilio';
-  sms_provider_status: any;
+  sms_provider_status: {
+    brevo?: {
+      healthy?: boolean;
+      last_success_at?: string | null;
+      failure_count?: number;
+      last_error?: string | null;
+    };
+    twilio?: {
+      healthy?: boolean;
+      last_success_at?: string | null;
+      failure_count?: number;
+      last_error?: string | null;
+    };
+  } | null;
   alert_email: string | null;
   alert_phone: string | null;
   last_provider_switch_at: string | null;
@@ -624,7 +637,7 @@ export default function SuperAdminConfig() {
                                 </span>
                               </div>
                             )}
-                            {platformSettings.sms_provider_status.brevo.failure_count > 0 && (
+                            {(platformSettings.sms_provider_status.brevo.failure_count ?? 0) > 0 && (
                               <div className="flex items-center justify-between">
                                 <span className="text-gray-400">Failure Count:</span>
                                 <span className="text-orange-400">{platformSettings.sms_provider_status.brevo.failure_count}</span>
